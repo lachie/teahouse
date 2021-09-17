@@ -1,0 +1,34 @@
+{
+  "name": "teahouse",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/cron": "^1.7.3",
+    "@types/node": "^16.7.10",
+    "prettier": "^2.3.2",
+    "ts-node": "^10.2.1",
+    "typescript": "^4.4.2"
+  },
+  "dependencies": {
+    "async-mqtt": "^2.6.1",
+    "cron": "^1.8.2",
+    "date-fns": "^2.23.0",
+    "deep-object-diff": "^1.1.0",
+    "emittery": "^0.9.2",
+    "immutable": "^4.0.0-rc.14",
+    "io-ts": "^2.2.16",
+    "io-ts-types": "^0.5.16",
+    "mqtt": "^4.2.8",
+    "object-path-immutable": "^4.1.2",
+    "ts-essentials": "^8.1.0",
+    "ts-pattern": "^3.2.5",
+    "xstate": "^4.23.4"
+  },
+  "prettier": {
+    "trailingComma": "all",
+    "tabWidth": 2,
+    "semi": false,
+    "singleQuote": true
+  }
+}
