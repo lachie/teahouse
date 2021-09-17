@@ -5,6 +5,8 @@ https://guide.elm-lang.org/architecture/
 
 In teahouse, instead of `Html` the "view" is your house :)
 
+For a taste, take a look at [my house!](lachies-house.ts)
+
 ## story
 
 Things like Home Assistant look pretty cool, but they end up being programming in YAML.
