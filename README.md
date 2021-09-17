@@ -20,7 +20,9 @@ So I decided to try to work up something like TEA, but in Typescript, and a lot 
 > What happens within the ~Elm~ teahouse program though? It always breaks into three parts:
 
 > Model — the state of your ~application~ house.
+
 > ~View~ House — a way to turn your state into ~HTML~ your house.
+
 > Update — a way to update your state based on messages.
 
 ### Model
