@@ -94,7 +94,7 @@ function isKidWeek(date: Date): boolean {
 // Is it late?
 function isHourLate(date: Date): boolean {
   const hour = date.getHours()
-  return hour < 6 || isKidWeek(date) ? hour >= 21 : hour >= 23
+  return ((hour < 6) || isKidWeek(date)) ? (hour >= 21) : (hour >= 23)
 }
 
 const updateModelDate = (model: Model, { date }: SetHour): Model =>
