@@ -13,7 +13,10 @@ import { Sub } from './subscriptions'
 import { Cron } from './cron'
 import secrets from './secrets.json'
 
-// msg
+/*
+ * message
+ */
+type Msg = SetOccupancy | SetHour
 
 type SetOccupancy = { type: 'set-occupancy'; room: string; occupied: boolean }
 const SetOccupancy =
@@ -27,13 +30,10 @@ const SetOccupancy =
 type SetHour = { type: 'set-hour'; date: Date }
 const SetHour = (date: Date): SetHour => ({ type: 'set-hour', date })
 
-type Msg = SetOccupancy | SetHour
 
-// model
-type PlayroomModel = {
-  occupied: boolean
-  lightOn: boolean
-}
+/*
+ * model
+ */
 type Model = {
   rooms: {
     playroom: PlayroomModel
@@ -43,6 +43,12 @@ type Model = {
   hourLate: boolean
   kidweek: boolean
 }
+
+type PlayroomModel = {
+  occupied: boolean
+  lightOn: boolean
+}
+
 type RoomId = keyof Model['rooms']
 
 const initialDate = new Date()
@@ -59,22 +65,36 @@ let initialModel: Model = {
   },
 }
 
-// update
+/*
+ * update
+ */
+const update = (model: Model, msg: Msg): [Model, Command<Msg>] =>
+  match<Msg, [Model, Command<Msg>]>(msg)
+    .with({ type: 'set-occupancy' }, (msg) => [
+      updateOccupancy(model, msg),
+      CmdNone,
+    ])
+    .with({ type: 'set-hour' }, (msg) => [updateModelDate(model, msg), CmdNone])
+    .exhaustive()
+
 const updateOccupancy = (
   model: Model,
   { room, occupied }: SetOccupancy,
 ): Model => immutable.set(model, ['rooms', room, 'occupied'], occupied)
 
-function isHourLate(date: Date): boolean {
-  const hour = date.getHours()
-  return hour < 6 || isKidWeek(date) ? hour >= 21 : hour >= 23
-}
+// I've got my kids every other fortnight, for a fortnight
 function isKidWeek(date: Date): boolean {
   const kidWeekRef = new Date('2021-08-21')
   const delta = differenceInCalendarDays(date, kidWeekRef)
   const fortnight = Math.floor(delta / 14)
 
   return fortnight % 2 == 0
+}
+
+// Is it late?
+function isHourLate(date: Date): boolean {
+  const hour = date.getHours()
+  return hour < 6 || isKidWeek(date) ? hour >= 21 : hour >= 23
 }
 
 const updateModelDate = (model: Model, { date }: SetHour): Model =>
@@ -85,20 +105,15 @@ const updateModelDate = (model: Model, { date }: SetHour): Model =>
     date: date,
   })
 
-const update = (model: Model, msg: Msg): [Model, Command<Msg>] =>
-  match<Msg, [Model, Command<Msg>]>(msg)
-    .with({ type: 'set-occupancy' }, (msg) => [
-      updateOccupancy(model, msg),
-      CmdNone,
-    ])
-    .with({ type: 'set-hour' }, (msg) => [updateModelDate(model, msg), CmdNone])
-    .exhaustive()
-
-// subscriptions
+/*
+ * subscriptions
+ */
 const subscriptions = (_model: Model): Sub<Msg> =>
   Sub(Cron('0 * * * * *', SetHour))
 
-// house
+/*
+* house
+*/
 const house = (model: Model): Container<Msg> => ({
   type: 'house',
   key: 'house',
@@ -132,12 +147,13 @@ const playroom = (
   ])
 }
 
+/*
+ * runtime
+ */
 const mqttClient = mqtt.connect(secrets.mqtt.broker, {
   username: secrets.mqtt.username,
   password: secrets.mqtt.password,
 })
-
-// runtime
 
 runtime(
   {
