@@ -13,18 +13,20 @@ export class ScheduleManager<Msg> {
     this.cancelDispatch(key)
 
     const fullKey = [key, ...this.key].join('.')
-    console.log('dispatchAfter', fullKey, delay)
     const newTimer = setTimeout(() => {
-      console.log('running scheduled input', msg)
-      console.log(this.dispatchMessage.toString())
+      console.log('ScheduleManager dispatchAfter', key, delay, msg)
       this.dispatchMessage(msg)
     }, delay)
     this.timers[fullKey] = newTimer
   }
 
+  dispatchNow(key: string, msg: Msg) {
+    this.cancelDispatch(key)
+    this.dispatchMessage(msg)
+  }
+
   cancelDispatch(key: string) {
     const fullKey = [key, ...this.key].join('.')
-    console.log('cancelDispatch', fullKey)
 
     const existingTimer = this.timers[fullKey]
     if (existingTimer !== undefined) {

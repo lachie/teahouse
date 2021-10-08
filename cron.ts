@@ -32,6 +32,7 @@ export class CronEffect<Msg> {
     const taggers = this.taggers[cronTime]
     const now = new Date()
     for (const tagger of taggers) {
+      console.log('CronEffect sendToApp', tagger(now))
       this.sendToApp(tagger(now))
     }
   }

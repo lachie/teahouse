@@ -9,11 +9,19 @@ import {
   SubscriptionManager,
 } from './mqttSubscriptionManager'
 import { Sub, SubscriptionsManager } from './subscriptions'
+import { WriteApi as InfluxWriteApi } from '@influxdata/influxdb-client'
+
+import * as t from 'io-ts'
+import { failure } from 'io-ts/PathReporter'
+import { pipe } from 'fp-ts/function'
+import { getOrElse } from 'fp-ts/Either'
+import { Json } from 'fp-ts/Json'
 
 export class RuntimeContext<Msg> {
   constructor(
     readonly key: string[],
     readonly mqttClient: mqtt.AsyncClient,
+    readonly influxClient: InfluxWriteApi,
     readonly subMgr: SubscriptionManager,
     readonly schedMgr: ScheduleManager<Msg>,
     public dispatchMessage: (m: Msg) => void = (m: Msg) => {},
@@ -23,6 +31,7 @@ export class RuntimeContext<Msg> {
     return new RuntimeContext(
       this.key.concat(key),
       this.mqttClient,
+      this.influxClient,
       this.subMgr.push(key),
       this.schedMgr.push(key),
       this.dispatchMessage,
@@ -42,13 +51,18 @@ type RuntimeSpec<Model, Msg> = {
   house: (m: Model) => Container<Msg>
 }
 
+type DispatchAny = (m: any) => void
+type GetAny = () => any
+type Server = (d: DispatchAny, m: GetAny) => unknown
 type Extras = {
   mqttClient: mqtt.AsyncClient
+  influxClient: InfluxWriteApi
+  inputServers: Server[]
 }
 
 export function runtime<Msg, Model>(
   spec: RuntimeSpec<Model, Msg>,
-  { mqttClient }: Extras,
+  { mqttClient, influxClient, inputServers: servers }: Extras,
 ) {
   const scheduleManager = new ScheduleManager<Msg>()
 
@@ -59,11 +73,16 @@ export function runtime<Msg, Model>(
   const runtimeContext = new RuntimeContext<Msg>(
     [],
     mqttClient,
+    influxClient,
     subscriptionManager,
     scheduleManager,
   )
 
   const rt = new Runtime({ ...spec, runtimeContext })
+
+  const dispatchMessage = rt.dispatchMessage.bind(rt)
+  const getModel = () => rt.model
+  servers.forEach((s) => s(dispatchMessage, getModel))
 
   rt.run()
 }
@@ -102,15 +121,17 @@ export class Runtime<Model, Msg> {
   }
 
   run() {
-    let nextHouse = this.house(this.model)
+    console.log('initial model', this.model)
     this.subscriptionsManager.updateSubs(this.subscriptions(this.model))
 
+    const nextHouse = this.house(this.model)
     this.houseState = this.reifyNode(this.runtimeContext, nextHouse, Empty)
   }
 
   dispatchMessage(msg: Msg) {
     const [nextModel, cmd] = this.update(this.model, msg)
     this.model = nextModel
+    console.log('model after update', this.model)
     this.subscriptionsManager.updateSubs(this.subscriptions(nextModel))
 
     // TODO handle cmds

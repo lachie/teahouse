@@ -28,20 +28,14 @@ export class PersonDetector<Msg> extends Device<PersonDetectorNode<Msg>, Msg> {
     }
   }
 
-  add(
-    { subMgr, dispatchMessage, schedMgr }: RuntimeContext<Msg>,
-    p: PersonDetectorNode<Msg>,
-  ) {
+  add({ subMgr, schedMgr }: RuntimeContext<Msg>, p: PersonDetectorNode<Msg>) {
     subMgr.subscribe(p.key, p.topic, ({ message }: { message: string }) => {
-      console.log(
-        'personDetector received',
-        message === '1' ? 'occupied' : 'not occupied',
-      )
       const occupied = message === '1'
+      console.log('personDetector mqtt sub, occupied=', occupied)
       const msg = p.onChange(occupied)
 
       if (occupied) {
-        dispatchMessage(msg)
+        schedMgr.dispatchNow(p.key, msg)
       } else {
         schedMgr.dispatchAfter(p.key, p.offDelay, msg)
       }

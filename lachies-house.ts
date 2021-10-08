@@ -12,44 +12,24 @@ import { PersonDetector, RFLight } from './devices'
 import { Sub } from './subscriptions'
 import { Cron } from './cron'
 import secrets from './secrets.json'
+import { InfluxDB } from '@influxdata/influxdb-client'
+import { Metrics } from './devices/metrics'
+import httpInterface from './interfaces/http'
 
-/*
- * message
- */
-type Msg = SetOccupancy | SetHour
-
-type SetOccupancy = { type: 'set-occupancy'; room: string; occupied: boolean }
-const SetOccupancy =
-  (room: string) =>
-  (occupied: boolean): SetOccupancy => ({
-    type: 'set-occupancy',
-    room,
-    occupied,
-  })
-
-type SetHour = { type: 'set-hour'; date: Date }
-const SetHour = (date: Date): SetHour => ({ type: 'set-hour', date })
-
-
-/*
- * model
- */
-type Model = {
-  rooms: {
-    playroom: PlayroomModel
-  }
-  date: Date
-  hour: number
-  hourLate: boolean
-  kidweek: boolean
-}
-
-type PlayroomModel = {
-  occupied: boolean
-  lightOn: boolean
-}
-
-type RoomId = keyof Model['rooms']
+import * as t from 'io-ts'
+import * as tt from 'io-ts-types'
+import { Model, PlayroomModel } from './lachies-house/Model'
+import {
+  Msg,
+  SetOccupancy,
+  SetHour,
+  MsgT,
+  SetLightOn,
+  ToggleLight,
+  LightState,
+  LightStates,
+  LightStateT,
+} from './lachies-house/Msg'
 
 const initialDate = new Date()
 let initialModel: Model = {
@@ -60,7 +40,7 @@ let initialModel: Model = {
   rooms: {
     playroom: {
       occupied: false,
-      lightOn: false,
+      lightOn: 'detect',
     },
   },
 }
@@ -75,12 +55,27 @@ const update = (model: Model, msg: Msg): [Model, Command<Msg>] =>
       CmdNone,
     ])
     .with({ type: 'set-hour' }, (msg) => [updateModelDate(model, msg), CmdNone])
+    .with({ type: 'set-light-on' }, (msg) => [
+      updateLightOn(model, msg),
+      CmdNone,
+    ])
+    .with({ type: 'toggle-light' }, (msg) => [toggleLight(model, msg), CmdNone])
     .exhaustive()
 
 const updateOccupancy = (
   model: Model,
   { room, occupied }: SetOccupancy,
 ): Model => immutable.set(model, ['rooms', room, 'occupied'], occupied)
+
+const updateLightOn = (model: Model, { room, lightOn }: SetLightOn): Model =>
+  immutable.set(model, ['rooms', room, 'lightOn'], lightOn)
+
+const nextLightState = (s: LightState): LightState => {
+  const i = LightStates.indexOf(s)
+  return LightStates[(i + 1) % LightStates.length]
+}
+const toggleLight = (model: Model, { room }: ToggleLight): Model =>
+  immutable.update(model, ['rooms', room, 'lightOn'], nextLightState)
 
 // I've got my kids every other fortnight, for a fortnight
 function isKidWeek(date: Date): boolean {
@@ -94,12 +89,12 @@ function isKidWeek(date: Date): boolean {
 // Is it late?
 function isHourLate(date: Date): boolean {
   const hour = date.getHours()
-  return ((hour < 6) || isKidWeek(date)) ? (hour >= 21) : (hour >= 23)
+  return hour < 6 || isKidWeek(date) ? hour >= 21 : hour >= 23
 }
 
 const updateModelDate = (model: Model, { date }: SetHour): Model =>
   immutable.assign(model, undefined, {
-    kidWeek: isKidWeek(date),
+    kidweek: isKidWeek(date),
     hour: date.getHours(),
     hourLate: isHourLate(date),
     date: date,
@@ -112,39 +107,60 @@ const subscriptions = (_model: Model): Sub<Msg> =>
   Sub(Cron('0 * * * * *', SetHour))
 
 /*
-* house
-*/
+ * house
+ */
 const house = (model: Model): Container<Msg> => ({
   type: 'house',
   key: 'house',
   children: [playroom(model.rooms['playroom'], model)],
 })
 
+const shortDelay = 60 * 1000
+const defaultDelay = 10 * 60 * 1000
+
 const playroom = (
   room: PlayroomModel,
   { kidweek, hour, hourLate }: Model,
 ): Container<Msg> => {
-  // when the kids are home and its late, don't do anything
-  if (kidweek && hour >= 21) {
-    return Room('playroom', [])
+  const { occupied, lightOn } = room
+
+  let switchLightOn = false
+  switch (lightOn) {
+    case 'on':
+      switchLightOn = true
+      break
+    case 'off':
+      switchLightOn = false
+      break
+    case 'detect':
+      switchLightOn = occupied
+      // when the kids are home and its late, force the light off
+      if (kidweek && hour >= 21) {
+        switchLightOn = false
+      }
   }
 
   // default off time is 10 minutes
-  let offDelay = 10 * 60 * 1000
+  let offDelay = defaultDelay
   // when its late, decrease off delay to 1 minute
   if (hourLate) {
-    offDelay = 1 * 60 * 1000
+    offDelay = shortDelay
   }
 
-  return Room('playroom', [
-    RFLight.make('lights', 'lightbringer/playroom/light', room.occupied),
+  return Room(
+    'playroom',
+    Metrics.make('occupied', { room: 'playroom' }, [
+      'occupied',
+      occupied ? 1 : 0,
+    ]),
+    RFLight.make('lights', 'lightbringer/playroom/light', switchLightOn),
     PersonDetector.make(
       'detector',
       'lightbringer/playroom/occupied',
       SetOccupancy('playroom'),
       offDelay,
     ),
-  ])
+  )
 }
 
 /*
@@ -155,6 +171,13 @@ const mqttClient = mqtt.connect(secrets.mqtt.broker, {
   password: secrets.mqtt.password,
 })
 
+const influxClient = new InfluxDB({
+  url: secrets.influx.url,
+  token: secrets.influx.token,
+}).getWriteApi(secrets.influx.org, secrets.influx.bucket)
+
+const inputServers = [httpInterface(MsgT, 3030)]
+
 runtime(
   {
     update,
@@ -162,5 +185,5 @@ runtime(
     subscriptions,
     initialModel,
   },
-  { mqttClient },
+  { mqttClient, influxClient, inputServers },
 )

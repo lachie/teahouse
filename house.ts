@@ -9,7 +9,7 @@ export type Container<Msg> = Node & {
 
 export const Empty: Node = { type: 'empty', key: 'empty' }
 
-export const Room = <Msg>(key: string, children: Container<Msg>[]) => ({
+export const Room = <Msg>(key: string, ...children: Container<Msg>[]) => ({
   type: 'room',
   key,
   children,
