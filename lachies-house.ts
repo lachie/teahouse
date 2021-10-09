@@ -17,7 +17,6 @@ import * as mqtt from 'async-mqtt'
 import { InfluxDB } from '@influxdata/influxdb-client'
 
 import HttpInterfaceFactory from './interfaces/http'
-import websocketInterface from './interfaces/websocket'
 
 import secrets from './secrets.json'
 
@@ -31,10 +30,8 @@ import {
   ToggleLight,
   LightState,
   LightStates,
-  LightStateT,
 } from './lachies-house/Msg'
 import { InterfaceFactory } from './interfaces'
-import WebsocketInterfaceFactory from './interfaces/websocket'
 
 const initialDate = new Date()
 let initialModel: Model = {
