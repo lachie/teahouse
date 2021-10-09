@@ -1,4 +1,4 @@
-import { Cron, CronEffect } from './cron'
+import { Cron, CronEffect } from '../effects/cron'
 
 type SubManagers<Msg> = {
   cron: CronEffect<Msg>

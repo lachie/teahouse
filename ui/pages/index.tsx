@@ -28,24 +28,36 @@ const Playroom = ({ model }: PlayroomProps) => {
     'detect',
   )}`
 
+  const occupiedIcon = `h-8 w-8  float-left mt-0.5 mr-3 ${
+    model.occupied ? 'text-green-500' : 'text-gray-200'
+  }`
+
   return (
     <div className="text-gray-600 flex justify-around py-6">
       <div className="py-2">
-        <span className="text-lg text-gray-400 font-semibold">Playroom </span>
-        <div className="flex float-left h-5 w-5 text-green-500">
-          <UserIcon className="h-5 w-5 absolute inline-flex animate-ping duration-1000 opacity-75"></UserIcon>
-          <UserIcon className="h-5 w-5 relative inline-flex"></UserIcon>
-        </div>
-        &mdash; {model.occupied ? 'occupied' : 'empty'}
+        <UserIcon className={occupiedIcon}></UserIcon>
+        <span className="text-2xl text-gray-400 font-semibold">Playroom </span>
       </div>
       <div className="">
-        <button className={onBtn} onClick={() => setLightMode('on')}>
+        <button
+          className={onBtn}
+          onClick={() => setLightMode('on')}
+          title="Switch the light on"
+        >
           <LightBulbIcon className="h-8 w-8"></LightBulbIcon>
         </button>
-        <button className={offBtn} onClick={() => setLightMode('off')}>
+        <button
+          className={offBtn}
+          onClick={() => setLightMode('off')}
+          title="Switch the light off"
+        >
           <LightBulbOffIcon className="h-8 w-8"></LightBulbOffIcon>
         </button>
-        <button className={detectBtn} onClick={() => setLightMode('detect')}>
+        <button
+          className={detectBtn}
+          onClick={() => setLightMode('detect')}
+          title="Put the light in detect mode"
+        >
           <StatusOnlineIcon className="h-8 w-8"></StatusOnlineIcon>
         </button>
       </div>

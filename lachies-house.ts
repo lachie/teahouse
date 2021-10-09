@@ -1,23 +1,26 @@
 process.env.TZ = 'Australia/Sydney'
 
-import * as mqtt from 'async-mqtt'
 import { match } from 'ts-pattern'
 import { differenceInCalendarDays } from 'date-fns'
 import * as immutable from 'object-path-immutable'
 
 import { Command, CmdNone } from './commands'
-import { runtime } from './runtime'
 import { Container, Room } from './house'
-import { PersonDetector, RFLight } from './devices'
-import { Sub } from './subscriptions'
-import { Cron } from './cron'
-import secrets from './secrets.json'
-import { InfluxDB } from '@influxdata/influxdb-client'
-import { Metrics } from './devices/metrics'
-import httpInterface from './interfaces/http'
 
-import * as t from 'io-ts'
-import * as tt from 'io-ts-types'
+import { PersonDetector, RFLight, Metrics } from './devices'
+
+import { runtime } from './runtime'
+import { Sub } from './runtime/subscriptions'
+import { Cron } from './effects/cron'
+
+import * as mqtt from 'async-mqtt'
+import { InfluxDB } from '@influxdata/influxdb-client'
+
+import HttpInterfaceFactory from './interfaces/http'
+import websocketInterface from './interfaces/websocket'
+
+import secrets from './secrets.json'
+
 import { Model, PlayroomModel } from './lachies-house/Model'
 import {
   Msg,
@@ -30,6 +33,8 @@ import {
   LightStates,
   LightStateT,
 } from './lachies-house/Msg'
+import { InterfaceFactory } from './interfaces'
+import WebsocketInterfaceFactory from './interfaces/websocket'
 
 const initialDate = new Date()
 let initialModel: Model = {
@@ -176,7 +181,10 @@ const influxClient = new InfluxDB({
   token: secrets.influx.token,
 }).getWriteApi(secrets.influx.org, secrets.influx.bucket)
 
-const inputServers = [httpInterface(MsgT, 3030)]
+const interfaces: InterfaceFactory<Msg, Model>[] = [
+  new HttpInterfaceFactory(MsgT, 3030),
+  new WebsocketInterfaceFactory(MsgT, 3031),
+]
 
 runtime(
   {
@@ -185,5 +193,5 @@ runtime(
     subscriptions,
     initialModel,
   },
-  { mqttClient, influxClient, inputServers },
+  { mqttClient, influxClient, interfaces },
 )
