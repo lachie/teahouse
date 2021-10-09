@@ -13,6 +13,7 @@ import {
   UserIcon,
 } from '@heroicons/react/outline'
 import { LightBulbOffIcon } from '../lib/LightBulbOffIcon'
+import { useModelUpdates } from '../lib/useModelUpdates'
 
 type PlayroomProps = { model: PlayroomModel }
 const Playroom = ({ model }: PlayroomProps) => {
@@ -20,7 +21,8 @@ const Playroom = ({ model }: PlayroomProps) => {
 
   const btn = 'py-2 px-4 text-white ring-opacity-50'
 
-  const opc = (x: LightState) => (model.lightOn === x ? 'ring-2' : 'ring-0')
+  const opc = (x: LightState) =>
+    model.lightOn === x ? 'ring-2 z-50' : 'ring-0 z-0'
 
   const onBtn = `${btn} rounded-l-lg bg-green-500 ring-green-500 ${opc('on')}`
   const offBtn = `${btn} bg-red-500 ring-red-500 ${opc('off')}`
@@ -66,23 +68,27 @@ const Playroom = ({ model }: PlayroomProps) => {
 }
 
 const Rooms = () => {
-  const { data, error } = useFetchModel('model', ModelT)
+  // const { data, error } = useFetchModel('model', ModelT)
+  const { model, errors } = useModelUpdates(ModelT)
 
-  if (error) return <b>oops: {JSON.stringify(error)}</b>
-  if (!data) return <div>loading...</div>
+  console.log('m', model)
+  console.log('e', errors)
+
+  if (errors) return <b>oops: {JSON.stringify(errors)}</b>
+  if (!model) return <div>loading...</div>
 
   return (
     <>
-      <Playroom model={data.rooms.playroom}></Playroom>
+      <Playroom model={model.rooms.playroom}></Playroom>
     </>
   )
 }
 
 const Home: NextPage = () => {
   return (
-    <div className="bg-blue-300 min-h-screen pt-16">
-      <div className="container mx-auto max-w-2xl shadow-lg rounded-xl">
-        <header className="bg-purple-600 rounded-t-xl mx-auto h-32">
+    <div className="bg-blue-300 min-h-screen md:pt-16">
+      <div className="container mx-auto md:max-w-2xl md:shadow-lg md:rounded-xl">
+        <header className="bg-purple-600 md:rounded-t-xl mx-auto h-16 md:h-32">
           <section className="flex items-center justify-center min-h-full">
             <div className=" text-center text-white text-3xl font-semibold">
               Teahouse
@@ -93,7 +99,7 @@ const Home: NextPage = () => {
         <section className="mx-auto bg-white">
           <Rooms></Rooms>
         </section>
-        <footer className="bg-purple-400 rounded-b-xl mx-auto h-8"></footer>
+        <footer className="bg-purple-400 md:rounded-b-xl mx-auto h-8"></footer>
       </div>
     </div>
   )

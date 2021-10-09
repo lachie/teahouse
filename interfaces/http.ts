@@ -6,6 +6,8 @@ import { failure } from 'io-ts/PathReporter'
 import morgan from 'morgan'
 import cors from 'cors'
 import { InterfaceFactory } from './index'
+import { request } from 'http'
+import { consoleLogger } from '@influxdata/influxdb-client'
 
 const mapErrors = mapLeft((errors: t.Errors) => failure(errors).join(','))
 
@@ -17,8 +19,14 @@ export default class HttpInterfaceFactory<Msg, Model> extends InterfaceFactory<
     super()
   }
   build() {
-    const { dispatchMessage, getModel } = this
-    if (dispatchMessage === undefined || getModel === undefined) {
+    const { dispatchMessage, getModel, subToModelChange, unsubToModelChange } =
+      this
+    if (
+      dispatchMessage === undefined ||
+      getModel === undefined ||
+      subToModelChange === undefined ||
+      unsubToModelChange === undefined
+    ) {
       throw new Error(
         "can't build http interface without dispatchMessage and getModel",
       )
@@ -45,6 +53,28 @@ export default class HttpInterfaceFactory<Msg, Model> extends InterfaceFactory<
         ),
       ),
     )
+
+    app.get('/model-updates', (req, res) => {
+      const headers = {
+        'Content-Type': 'text/event-stream',
+        Connection: 'keep-alive',
+        'Cache-Control': 'no-cache',
+      }
+      res.writeHead(200, headers)
+
+      console.log('sending initial model', getModel())
+      const data = `data: ${JSON.stringify(getModel())}\n\n`
+      res.write(data)
+
+      const clientHandler = (m: Model): void => {
+        console.log('sending model', m)
+        const data = `data: ${JSON.stringify(m)}\n\n`
+        res.write(data)
+      }
+
+      subToModelChange(clientHandler)
+      req.on('close', () => unsubToModelChange(clientHandler))
+    })
 
     app.get('/model/*', (req, res) => {
       res.json(getModel())

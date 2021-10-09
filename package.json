@@ -34,6 +34,7 @@
     "mqtt": "^4.2.8",
     "newtype-ts": "^0.3.4",
     "object-path-immutable": "^4.1.2",
+    "react-use-websocket": "^2.8.0",
     "ts-essentials": "^8.1.0",
     "ts-pattern": "^3.2.5",
     "ws": "^8.2.3",

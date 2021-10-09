@@ -183,7 +183,7 @@ const influxClient = new InfluxDB({
 
 const interfaces: InterfaceFactory<Msg, Model>[] = [
   new HttpInterfaceFactory(MsgT, 3030),
-  new WebsocketInterfaceFactory(MsgT, 3031),
+  // new WebsocketInterfaceFactory(MsgT, 3031),
 ]
 
 runtime(
