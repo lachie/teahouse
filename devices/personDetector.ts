@@ -8,6 +8,7 @@ export type PersonDetectorNode<Msg> = Node & {
   topic: string
   offDelay: number
   onChange: (b: boolean) => Msg
+  onRawChange?: (b: boolean) => Msg
 }
 
 const defaultOffDelay = 10 * 1000
@@ -18,6 +19,7 @@ export class PersonDetector<Msg> extends Device<PersonDetectorNode<Msg>, Msg> {
     topic: string,
     onChange: (b: boolean) => Msg,
     offDelay = defaultOffDelay,
+    onRawChange?: (b: boolean) => Msg,
   ): PersonDetectorNode<Msg> {
     return {
       type: 'personDetector',
@@ -25,6 +27,7 @@ export class PersonDetector<Msg> extends Device<PersonDetectorNode<Msg>, Msg> {
       topic,
       onChange,
       offDelay,
+      onRawChange,
     }
   }
 
@@ -32,6 +35,11 @@ export class PersonDetector<Msg> extends Device<PersonDetectorNode<Msg>, Msg> {
     subMgr.subscribe(p.key, p.topic, ({ message }: { message: string }) => {
       const occupied = message === '1'
       const msg = p.onChange(occupied)
+
+      if (p.onRawChange) {
+        const sensorMsg = p.onRawChange(occupied)
+        schedMgr.dispatchMessage(sensorMsg)
+      }
 
       if (occupied) {
         console.log('personDetector, occupied=true dispatching now')

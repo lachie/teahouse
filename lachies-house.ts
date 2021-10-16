@@ -10,7 +10,7 @@ import { Container, Room } from './house'
 import { PersonDetector, RFLight, Metrics } from './devices'
 
 import { runtime } from './runtime'
-import { Sub } from './runtime/subscriptions'
+import { Batch, Sub } from './runtime/subscriptions'
 import { Cron } from './effects/cron'
 
 import * as mqtt from 'async-mqtt'
@@ -20,7 +20,12 @@ import HttpInterfaceFactory from './interfaces/http'
 
 import secrets from './secrets.json'
 
-import { Model, PlayroomModel } from './lachies-house/Model'
+import {
+  Model,
+  ModelCache,
+  ModelCacheT,
+  PlayroomModel,
+} from './lachies-house/Model'
 import {
   Msg,
   SetOccupancy,
@@ -30,11 +35,24 @@ import {
   ToggleLight,
   LightState,
   LightStates,
+  SetSensorRaw,
 } from './lachies-house/Msg'
 import { InterfaceFactory } from './interfaces'
+import path from 'path/posix'
+import { ModelCacheFactory } from './interfaces/modelCache'
+
+const modelCachePath = path.resolve(__dirname, './model.json')
+
+const modelCacheFactory = new ModelCacheFactory<Model, ModelCache, Msg>(
+  modelCachePath,
+  ModelCacheT,
+  (m: Model): ModelCache => ({
+    rooms: { playroom: { lightOn: m.rooms.playroom.lightOn } },
+  }),
+)
 
 const initialDate = new Date()
-let initialModel: Model = {
+let initialModel: Model = modelCacheFactory.initialModel({
   date: initialDate,
   hour: initialDate.getHours(),
   hourLate: isHourLate(initialDate),
@@ -42,10 +60,11 @@ let initialModel: Model = {
   rooms: {
     playroom: {
       occupied: false,
+      sensors: {},
       lightOn: 'detect',
     },
   },
-}
+})
 
 /*
  * update
@@ -54,6 +73,10 @@ const update = (model: Model, msg: Msg): [Model, Command<Msg>] =>
   match<Msg, [Model, Command<Msg>]>(msg)
     .with({ type: 'set-occupancy' }, (msg) => [
       updateOccupancy(model, msg),
+      CmdNone,
+    ])
+    .with({ type: 'set-sensor-raw' }, (msg) => [
+      updateSensorRaw(model, msg),
       CmdNone,
     ])
     .with({ type: 'set-hour' }, (msg) => [updateModelDate(model, msg), CmdNone])
@@ -68,6 +91,11 @@ const updateOccupancy = (
   model: Model,
   { room, occupied }: SetOccupancy,
 ): Model => immutable.set(model, ['rooms', room, 'occupied'], occupied)
+
+const updateSensorRaw = (
+  model: Model,
+  { room, reading }: SetSensorRaw,
+): Model => immutable.set(model, ['rooms', room, 'sensors'], reading)
 
 const updateLightOn = (model: Model, { room, lightOn }: SetLightOn): Model =>
   immutable.set(model, ['rooms', room, 'lightOn'], lightOn)
@@ -118,7 +146,7 @@ const house = (model: Model): Container<Msg> => ({
 })
 
 const shortDelay = 60 * 1000
-const defaultDelay = 10 * 60 * 1000
+const defaultDelay = 5 * 60 * 1000
 
 const playroom = (
   room: PlayroomModel,
@@ -180,7 +208,7 @@ const influxClient = new InfluxDB({
 
 const interfaces: InterfaceFactory<Msg, Model>[] = [
   new HttpInterfaceFactory(MsgT, 3030),
-  // new WebsocketInterfaceFactory(MsgT, 3031),
+  modelCacheFactory,
 ]
 
 runtime(

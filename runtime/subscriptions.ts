@@ -14,6 +14,10 @@ export const Sub = <Msg>(subSpec: {
 }): OneSub<Msg> => {
   return { type: 'sub', sub: subSpec }
 }
+export const Batch = <Msg>(subs: Sub<Msg>[]): Batch<Msg> => ({
+  type: 'batch',
+  subs,
+})
 
 export class SubscriptionsManager<Msg> {
   subManagers: SubManagers<Msg>

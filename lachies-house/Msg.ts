@@ -21,6 +21,23 @@ export const SetOccupancy =
     occupied,
   })
 
+export const SensorReadingT = t.union([t.string, t.number, t.boolean])
+export type SensorReading = t.TypeOf<typeof SensorReadingT>
+
+export const SetSensorRawT = t.type({
+  type: t.literal('set-sensor-raw'),
+  room: t.string,
+  reading: SensorReadingT,
+})
+export type SetSensorRaw = t.TypeOf<typeof SetSensorRawT>
+export const SetSensorRaw =
+  (room: string) =>
+  (reading: string | number | boolean): SetSensorRaw => ({
+    type: 'set-sensor-raw',
+    room,
+    reading,
+  })
+
 export const LightStateT = t.keyof({ on: null, off: null, detect: null })
 export type LightState = t.TypeOf<typeof LightStateT>
 export const LightStates: LightState[] = ['on', 'off', 'detect']
@@ -59,6 +76,7 @@ export const SetHour = (date: Date): SetHour => ({ type: 'set-hour', date })
 
 export const MsgT = t.union([
   SetOccupancyT,
+  SetSensorRawT,
   SetHourT,
   SetLightOnT,
   ToggleLightT,

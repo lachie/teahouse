@@ -1,13 +1,11 @@
 import express from 'express'
 import { pipe } from 'fp-ts/function'
-import { match, mapLeft } from 'fp-ts/lib/Either'
+import { match, mapLeft } from 'fp-ts/Either'
 import * as t from 'io-ts'
 import { failure } from 'io-ts/PathReporter'
 import morgan from 'morgan'
 import cors from 'cors'
 import { InterfaceFactory } from './index'
-import { request } from 'http'
-import { consoleLogger } from '@influxdata/influxdb-client'
 
 const mapErrors = mapLeft((errors: t.Errors) => failure(errors).join(','))
 
