@@ -3,13 +3,19 @@ import { PersonDetector, PersonDetectorNode } from './personDetector'
 import { RFLight, RFLightNode } from './rfLight'
 import { Node } from '../house'
 import { Metrics, MetricsNode } from './metrics'
+import { ZLight, ZLightNode } from './zLight'
+import { ZButton, ZButtonNode } from './zButton'
+import { ZScene, ZSceneNode } from './zScene'
+import { MqttSensor, MqttSensorNode } from './mqttSensor'
+import { Mqtt } from '../effects/mqtt'
 
-export { RFLight, PersonDetector, Metrics }
+export { RFLight, PersonDetector, Metrics, ZLight, ZScene }
 
-type DeviceNode<Msg> = RFLightNode | PersonDetectorNode<Msg> | MetricsNode
-type DeviceList<Msg> = {
-  [k: string]: Device<DeviceNode<Msg>, Msg>
-}
+type DeviceNode<Msg> = RFLightNode | ZLightNode | PersonDetectorNode<Msg> | MetricsNode | ZButtonNode<Msg> | ZSceneNode | MqttSensorNode<Msg>
+type DeviceType<Msg> = DeviceNode<Msg>['type']
+type DeviceList<Msg> = Record<DeviceType<Msg>, Device<DeviceNode<Msg>, Msg>>
+  // [k: string]: Device<DeviceNode<Msg>, Msg>
+// }
 
 export class Devices<Msg> extends Device<DeviceNode<Msg>, Msg> {
   devices: DeviceList<Msg>
@@ -18,11 +24,17 @@ export class Devices<Msg> extends Device<DeviceNode<Msg>, Msg> {
     this.devices = {
       personDetector: new PersonDetector<Msg>(),
       rfLight: new RFLight(),
+      zLight: new ZLight(),
+      zButton: new ZButton(),
+      zScene: new ZScene(),
       metrics: new Metrics(),
+      mqttSensor: new MqttSensor()
     }
   }
   choose(d: Node): Device<DeviceNode<Msg>, Msg> {
-    return this.devices[d.type] || this.devices['default']
+    const dev = this.devices[d.type as DeviceType<Msg>]
+    if(dev) return dev
+    throw new Error(`unknown device ${d.type}`)
   }
   isDevice(d: Node): d is DeviceNode<Msg> {
     return Object.keys(this.devices).includes(d.type)

@@ -24,6 +24,10 @@ export class RFLight<Msg> extends Device<RFLightNode, Msg> {
     }
   }
 
+  add({ mqttClient }: RuntimeContext<Msg>, light: RFLightNode) {
+    mqttClient.publish(light.topic, light.on ? '1' : '0')
+  }
+
   update(
     { mqttClient }: RuntimeContext<Msg>,
     light: RFLightNode,

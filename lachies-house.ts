@@ -1,16 +1,13 @@
 process.env.TZ = 'Australia/Sydney'
-
 import { match } from 'ts-pattern'
-import { differenceInCalendarDays } from 'date-fns'
-import * as immutable from 'object-path-immutable'
 
-import { Command, CmdNone } from './commands'
 import { Container, Room } from './house'
 
-import { PersonDetector, RFLight, Metrics } from './devices'
+import { ZLight } from './devices'
+import { ZLightPayload, ZLightNode } from './devices/zLight'
 
 import { runtime } from './runtime'
-import { Batch, Sub } from './runtime/subscriptions'
+import { Batch, Sub, None } from './runtime/subscriptions'
 import { Cron } from './effects/cron'
 
 import * as mqtt from 'async-mqtt'
@@ -21,10 +18,13 @@ import HttpInterfaceFactory from './interfaces/http'
 import secrets from './secrets.json'
 
 import {
+  isHourLate,
+  isKidWeek,
   Model,
   ModelCache,
   ModelCacheT,
-  PlayroomModel,
+  RoomModel,
+  modelZero,
 } from './lachies-house/Model'
 import {
   Msg,
@@ -36,105 +36,99 @@ import {
   LightState,
   LightStates,
   SetSensorRaw,
+  SetZigbeeEvent,
+  SetScene,
+  SetValue,
+  SetConst,
+  ToggleBool,
 } from './lachies-house/Msg'
 import { InterfaceFactory } from './interfaces'
 import path from 'path/posix'
 import { ModelCacheFactory } from './interfaces/modelCache'
+import { Mqtt } from './effects/mqtt'
+import { update } from './lachies-house/update'
+import { ZButton } from './devices/zButton'
+import { hashMap, hashMapT } from './util/hashMap'
+import { ZPresence, ZTemp } from './devices/zSensor'
 
 const modelCachePath = path.resolve(__dirname, './model.json')
+const logPath = path.resolve(__dirname, './log.json')
 
 const modelCacheFactory = new ModelCacheFactory<Model, ModelCache, Msg>(
   modelCachePath,
   ModelCacheT,
+  modelZero,
   (m: Model): ModelCache => ({
-    rooms: { playroom: { lightOn: m.rooms.playroom.lightOn } },
+    rooms: {
+      playroom: {
+        scene: m.rooms.playroom.scene,
+        sensors: m.rooms.playroom.sensors,
+      },
+      backroom: {
+        scene: m.rooms.backroom.scene,
+        sensors: m.rooms.backroom.sensors,
+      },
+      office: {
+        scene: m.rooms.office.scene,
+        sensors: m.rooms.office.sensors,
+      },
+    },
   }),
 )
 
 const initialDate = new Date()
 let initialModel: Model = modelCacheFactory.initialModel({
+  doorbell: false,
+  doorbellBlink: false,
   date: initialDate,
   hour: initialDate.getHours(),
   hourLate: isHourLate(initialDate),
   kidweek: isKidWeek(initialDate),
+  sunProgress: [0, 'day'],
+  daylightProgress: 0,
   rooms: {
     playroom: {
       occupied: false,
       sensors: {},
-      lightOn: 'detect',
+      scene: undefined,
+    },
+    backroom: {
+      occupied: false,
+      sensors: {},
+      scene: undefined,
+    },
+    office: {
+      occupied: false,
+      sensors: {},
+      scene: undefined,
+    },
+    bedroom: {
+      occupied: false,
+      sensors: {},
+      scene: undefined,
+    },
+    sams_room: {
+      occupied: false,
+      sensors: {},
+      scene: undefined,
+    },
+    pipers_room: {
+      occupied: false,
+      sensors: {},
+      scene: undefined,
     },
   },
 })
 
 /*
- * update
- */
-const update = (model: Model, msg: Msg): [Model, Command<Msg>] =>
-  match<Msg, [Model, Command<Msg>]>(msg)
-    .with({ type: 'set-occupancy' }, (msg) => [
-      updateOccupancy(model, msg),
-      CmdNone,
-    ])
-    .with({ type: 'set-sensor-raw' }, (msg) => [
-      updateSensorRaw(model, msg),
-      CmdNone,
-    ])
-    .with({ type: 'set-hour' }, (msg) => [updateModelDate(model, msg), CmdNone])
-    .with({ type: 'set-light-on' }, (msg) => [
-      updateLightOn(model, msg),
-      CmdNone,
-    ])
-    .with({ type: 'toggle-light' }, (msg) => [toggleLight(model, msg), CmdNone])
-    .exhaustive()
-
-const updateOccupancy = (
-  model: Model,
-  { room, occupied }: SetOccupancy,
-): Model => immutable.set(model, ['rooms', room, 'occupied'], occupied)
-
-const updateSensorRaw = (
-  model: Model,
-  { room, reading }: SetSensorRaw,
-): Model => immutable.set(model, ['rooms', room, 'sensors'], reading)
-
-const updateLightOn = (model: Model, { room, lightOn }: SetLightOn): Model =>
-  immutable.set(model, ['rooms', room, 'lightOn'], lightOn)
-
-const nextLightState = (s: LightState): LightState => {
-  const i = LightStates.indexOf(s)
-  return LightStates[(i + 1) % LightStates.length]
-}
-const toggleLight = (model: Model, { room }: ToggleLight): Model =>
-  immutable.update(model, ['rooms', room, 'lightOn'], nextLightState)
-
-// I've got my kids every other fortnight, for a fortnight
-function isKidWeek(date: Date): boolean {
-  const kidWeekRef = new Date('2021-08-21')
-  const delta = differenceInCalendarDays(date, kidWeekRef)
-  const fortnight = Math.floor(delta / 14)
-
-  return fortnight % 2 == 0
-}
-
-// Is it late?
-function isHourLate(date: Date): boolean {
-  const hour = date.getHours()
-  return hour < 6 || isKidWeek(date) ? hour >= 21 : hour >= 23
-}
-
-const updateModelDate = (model: Model, { date }: SetHour): Model =>
-  immutable.assign(model, undefined, {
-    kidweek: isKidWeek(date),
-    hour: date.getHours(),
-    hourLate: isHourLate(date),
-    date: date,
-  })
-
-/*
  * subscriptions
  */
-const subscriptions = (_model: Model): Sub<Msg> =>
-  Sub(Cron('0 * * * * *', SetHour))
+const subscriptions = (model: Model): Sub<Msg> =>
+  Batch([
+    Sub(Cron('0 * * * * *', SetHour)),
+    (model.doorbell && Sub(Cron('*/2 * * * * *', ToggleBool('doorbellBlink'))))
+// Sub(Mqtt('zigbee2mqtt/#', SetZigbeeEvent))
+])
 
 /*
  * house
@@ -142,54 +136,160 @@ const subscriptions = (_model: Model): Sub<Msg> =>
 const house = (model: Model): Container<Msg> => ({
   type: 'house',
   key: 'house',
-  children: [playroom(model.rooms['playroom'], model)],
+  children: [
+    frontdoor(model),
+    playroom(model.rooms.playroom, model),
+    backroom(model.rooms.backroom, model),
+    office(model.rooms.office, model),
+  ],
 })
 
-const shortDelay = 60 * 1000
+
+const frontdoor = (model: Model): Container<Msg> => {
+  return Room('frontdoor',
+    ZButton.make(
+      'doorbell',
+      'frontdoor/button',
+      SetConst('doorbell', true),
+    ),
+  )
+}
+
+const scale = (v: number, min: number, max: number): number =>
+  Math.sign(max - min) * v * Math.abs(max - min) + min
+const sinUnit = (v: number) => Math.sin(Math.PI * v)
+const sinScale = (v: number, min: number, max: number): number =>
+  scale(sinUnit(v), min, max)
+
+const shortDelay = 30 * 1000
 const defaultDelay = 5 * 60 * 1000
+// DEV:
+// const shortDelay = 1 * 1000
+// const defaultDelay = 5 * 1000
 
-const playroom = (
-  room: PlayroomModel,
-  { kidweek, hour, hourLate }: Model,
-): Container<Msg> => {
-  const { occupied, lightOn } = room
+const kidWeekNoLightsAfterHour = 21
 
-  let switchLightOn = false
-  switch (lightOn) {
-    case 'on':
-      switchLightOn = true
-      break
-    case 'off':
-      switchLightOn = false
-      break
-    case 'detect':
-      switchLightOn = occupied
-      // when the kids are home and its late, force the light off
-      if (kidweek && hour >= 21) {
-        switchLightOn = false
-      }
-  }
 
-  // default off time is 10 minutes
-  let offDelay = defaultDelay
-  // when its late, decrease off delay to 1 minute
-  if (hourLate) {
-    offDelay = shortDelay
-  }
+const backroom = (room: RoomModel, model: Model): Container<Msg> => {
+  const [prog, dayNight] = model.sunProgress
+  let temp = (dayNight === 'day') ? prog : 1.0
+
+  console.log("backroom", room, model)
+
+  const buttons = hashMap({
+    '1_single': 'off',
+    '2_single': 'morning',
+    '3_single': 'daylight',
+  })
+
+  const scene = model.doorbell ? 'doorbell' : room.scene
+  const payload = hashMapT<ZLightPayload>({
+    off: { state: 'OFF' },
+    doorbell: {
+      state: 'ON',
+      color: { r: 255, g: 0, b: 0 },
+      brightness: 255
+    },
+    morning: {
+      white: [0.3, temp]
+    },
+    daylight: {
+      white: [1.0, temp]
+    },
+  })(scene)
+
+  return Room(
+    'backroom',
+    payload && ZLight.make('light1', 'ikea', 'backroom/lamp', payload),
+    ZButton.make(
+      'button1',
+      'backroom/buttonsx3-1',
+      SetScene('backroom', buttons),
+    ),
+    ZPresence.make('backroom', 'backroom/motion', SetSensorRaw('backroom')),
+    ZTemp.make('backroom', 'backroom/temp', SetSensorRaw('backroom')),
+  )
+}
+
+const office = (room: RoomModel, model: Model): Container<Msg> => {
+  const [prog, dayNight] = model.sunProgress
+  let temp = (dayNight === 'day') ? prog : 1.0
+
+  const buttons = hashMap({
+    '1_single': 'off',
+    '2_single': 'morning',
+    '2_double': 'morning2',
+    '3_single': 'daylight',
+    '4_single': 'purple',
+    '4_double': 'blue',
+  })
+  const scenes = hashMapT<ZLightPayload>({
+    off: { state: 'OFF' },
+    morning: {
+      white: [0.15, temp]
+    },
+    morning2: {
+      white: [0.3, temp]
+    },
+    daylight: {
+      white: [1.0, temp]
+    },
+    purple: { state: 'ON', brightness: 100, color: { r: 204, g: 24, b: 195 } },
+    blue: { state: 'ON', brightness: 100, color: { r: 2, g: 109, b: 163 } },
+  })
+  const payload = scenes(room.scene)
+
+  return Room(
+    'office',
+    payload && ZLight.make('light1', 'ikea', 'office/lamp', payload),
+    payload && ZLight.make('light2', 'ikea', 'office/lamp-small', payload),
+    ZButton.make('button1', 'switch-x4', SetScene('office', buttons)),
+    ZTemp.make('office', 'office/temp', SetSensorRaw('office')),
+  )
+}
+
+const playroom = (room: RoomModel, model: Model): Container<Msg> => {
+  const [prog, dayNight] = model.sunProgress
+  let temp = (dayNight === 'day') ? prog : 1.0
+
+  const buttons = hashMap({
+    '1_single': 'off',
+    '2_single': 'morning',
+    '3_single': 'daylight',
+  })
+  const scene = model.doorbell ? 'doorbell' : room.scene
+  const scenes = hashMapT<ZLightPayload>({
+    off: { state: 'OFF' },
+    doorbell: {
+      state: 'ON',
+      color: { r: 255, g: 0, b: 0 },
+      brightness: 255
+    },
+    morning: {
+      white: [0.3, temp]
+    },
+    daylight: {
+      white: [1.0, temp]
+    },
+  })
+
+  const payload = scenes(scene)
 
   return Room(
     'playroom',
-    Metrics.make('occupied', { room: 'playroom' }, [
-      'occupied',
-      occupied ? 1 : 0,
-    ]),
-    RFLight.make('lights', 'lightbringer/playroom/light', switchLightOn),
-    PersonDetector.make(
-      'detector',
-      'lightbringer/playroom/occupied',
-      SetOccupancy('playroom'),
-      offDelay,
+    payload && ZLight.make('light1', 'ikea', 'playroom/lamp-desk', payload),
+    payload && ZLight.make('light2', 'ikea', 'playroom/lamp-tall', payload),
+    ZButton.make(
+      'button1',
+      'playroom/buttonsx3-1',
+      SetScene('playroom', buttons),
     ),
+    ZButton.make(
+      'button2',
+      'playroom/buttonsx3-2',
+      SetScene('playroom', buttons),
+    ),
+    ZTemp.make('playroom', 'playroom/temp', SetSensorRaw('playroom')),
   )
 }
 
@@ -218,5 +318,6 @@ runtime(
     subscriptions,
     initialModel,
   },
-  { mqttClient, influxClient, interfaces },
+  { mqttClient, influxClient, interfaces, logPath },
+  SetHour(new Date())
 )

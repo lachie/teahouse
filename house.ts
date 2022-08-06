@@ -9,10 +9,10 @@ export type Container<Msg> = Node & {
 
 export const Empty: Node = { type: 'empty', key: 'empty' }
 
-export const Room = <Msg>(key: string, ...children: Container<Msg>[]) => ({
+export const Room = <Msg>(key: string, ...children: (Container<Msg> | undefined)[]) => ({
   type: 'room',
   key,
-  children,
+  children: children.filter((x): x is Container<Msg> => x !== undefined ),
 })
 
 export function isContainer<Msg>(node: AnyNode<Msg>): node is Container<Msg> {

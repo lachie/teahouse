@@ -21,22 +21,71 @@ export const SetOccupancy =
     occupied,
   })
 
+// SetScene
+export const SetSceneT = t.type({
+  type: t.literal('set-scene'),
+  room: t.string,
+  scene: t.union([t.string,t.undefined]),
+})
+
+export type SetScene = t.TypeOf<typeof SetSceneT>
+export const SetScene =
+  (room: string, tagScene: (action: string) => string | undefined = (x) => x) =>
+  (action: string): SetScene => ({
+    type: 'set-scene',
+    room,
+    scene: tagScene(action),
+  })
+
+// SetPresence
+// export const SetDataT = t.type({
+//   type: t.literal('set-data'),
+//   room: t.string,
+//   data: t.UnknownRecord
+// })
+
+// export type SetData = t.TypeOf<typeof SetDataT>
+// export const SetData =
+//   (room: string) =>
+//   (data: Record<string,unknown>): SetData => ({
+//     type: 'set-data',
+//     room,
+//     data
+  // })
+
 export const SensorReadingT = t.union([t.string, t.number, t.boolean])
 export type SensorReading = t.TypeOf<typeof SensorReadingT>
 
 export const SetSensorRawT = t.type({
   type: t.literal('set-sensor-raw'),
   room: t.string,
-  reading: SensorReadingT,
+  readings: t.UnknownRecord,
 })
 export type SetSensorRaw = t.TypeOf<typeof SetSensorRawT>
 export const SetSensorRaw =
   (room: string) =>
-  (reading: string | number | boolean): SetSensorRaw => ({
+  (readings: Record<string, unknown>): SetSensorRaw => ({
     type: 'set-sensor-raw',
     room,
-    reading,
+    readings,
   })
+
+const ImmutablePath = t.union([t.string, t.readonlyArray(t.union([t.string, t.number]))])
+// type Path = string | ReadonlyArray<number | string>;
+
+export const SetValueT = t.type({type: t.literal('set-value'), key: ImmutablePath, value: t.unknown})
+export type SetValue = t.TypeOf<typeof SetValueT>
+export const SetValue = (key: Path) => (value: unknown): SetValue => ({type: 'set-value', key, value})
+export const SetConst = (key: Path, value: unknown) => (..._: unknown[]): SetValue => ({type: 'set-value', key, value})
+
+export const ClearValueT = t.type({type: t.literal('clear-value'), key: ImmutablePath})
+export type ClearValue = t.TypeOf<typeof ClearValueT>
+export const ClearValue = (key: Path): ClearValue => ({type: 'clear-value', key})
+
+
+export const ToggleBoolT = t.type({type: t.literal('toggle-bool'), key: t.string})
+export type ToggleBool = t.TypeOf<typeof ToggleBoolT>
+export const ToggleBool = (key: string) => (): ToggleBool => ({type: 'toggle-bool', key})
 
 export const LightStateT = t.keyof({ on: null, off: null, detect: null })
 export type LightState = t.TypeOf<typeof LightStateT>
@@ -74,11 +123,26 @@ export const SetHourT = t.type({
 export type SetHour = t.TypeOf<typeof SetHourT>
 export const SetHour = (date: Date): SetHour => ({ type: 'set-hour', date })
 
+export const SetZigbeeEventT = t.type({
+  type: t.literal('set-zigbee-event'),
+  key: t.string,
+  data: t.UnknownRecord
+})
+
+export type SetZigbeeEvent = t.TypeOf<typeof SetZigbeeEventT>
+export const SetZigbeeEvent = (key: string, data: Record<string,unknown>): SetZigbeeEvent => ({ type: 'set-zigbee-event', key, data })
+
 export const MsgT = t.union([
+  SetValueT,
+  ClearValueT,
+  ToggleBoolT,
   SetOccupancyT,
+  SetSceneT,
   SetSensorRawT,
   SetHourT,
+  // SetDataT,
   SetLightOnT,
+  SetZigbeeEventT,
   ToggleLightT,
 ])
 export type Msg = t.TypeOf<typeof MsgT>

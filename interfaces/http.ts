@@ -60,12 +60,12 @@ export default class HttpInterfaceFactory<Msg, Model> extends InterfaceFactory<
       }
       res.writeHead(200, headers)
 
-      console.log('sending initial model', getModel())
+      console.log('HTTP sending initial model', getModel())
       const data = `data: ${JSON.stringify(getModel())}\n\n`
       res.write(data)
 
       const clientHandler = (m: Model): void => {
-        console.log('sending model', m)
+        console.log('HTTP sending model', m)
         const data = `data: ${JSON.stringify(m)}\n\n`
         res.write(data)
       }

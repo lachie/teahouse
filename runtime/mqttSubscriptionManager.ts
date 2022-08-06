@@ -21,6 +21,7 @@ export class CoreSubscriptionManager {
     this.mqttClient.on('message', (topic, message) => {
       this.dispatchMessage({ topic, message: message.toString() })
     })
+
   }
 
   subscriptionManager() {

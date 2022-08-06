@@ -18,6 +18,7 @@ export class ModelCacheFactory<Model, ModelCache, Msg> extends InterfaceFactory<
   constructor(
     public cachePath: string,
     public modelCacheCodec: t.Decoder<unknown, ModelCache>,
+    public modelZero: unknown,
     public modelToModelCache: (m: Model) => ModelCache,
   ) {
     super()
@@ -47,11 +48,7 @@ export class ModelCacheFactory<Model, ModelCache, Msg> extends InterfaceFactory<
       // TODO io-ts
       raw = JSON.parse(fs.readFileSync(this.cachePath, 'utf-8'))
     } catch (e) {
-      raw = {
-        rooms: {
-          playroom: { lightOn: 'detect' },
-        },
-      }
+      raw = this.modelZero
     }
 
     return pipe(raw, this.modelCacheCodec.decode, getOrError)

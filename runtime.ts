@@ -10,10 +10,14 @@ import { Sub, SubscriptionsManager } from './runtime/subscriptions'
 
 import * as mqtt from 'async-mqtt'
 import EventEmitter from 'events'
-import { WriteApi as InfluxWriteApi } from '@influxdata/influxdb-client'
+import {
+  consoleLogger,
+  WriteApi as InfluxWriteApi,
+} from '@influxdata/influxdb-client'
 import immutable from 'object-path-immutable'
 import equal from 'deep-equal'
 import { InterfaceFactory } from './interfaces'
+import * as fs from 'node:fs';
 
 export class RuntimeContext<Msg> {
   constructor(
@@ -53,13 +57,15 @@ type RuntimeSpec<Model, Msg> = {
 type Extras<Msg, Model> = {
   mqttClient: mqtt.AsyncClient
   influxClient: InfluxWriteApi
-  interfaces: InterfaceFactory<Msg, Model>[]
+  interfaces: InterfaceFactory<Msg, Model>[],
+  logPath: string
 }
 
 // the main entrypoint for user's house scripts
 export function runtime<Msg, Model>(
   spec: RuntimeSpec<Model, Msg>,
   extras: Extras<Msg, Model>,
+  initialMsg?: Msg
 ) {
   const scheduleManager = new ScheduleManager<Msg>()
   const { mqttClient, influxClient } = extras
@@ -78,8 +84,10 @@ export function runtime<Msg, Model>(
 
   const rt = new Runtime({ ...spec, runtimeContext, extras })
 
-  rt.run()
+  rt.run(initialMsg)
 }
+
+
 
 export class Runtime<Model, Msg> {
   update: (model: Model, msg: Msg) => [Model, Command<Msg>]
@@ -91,6 +99,7 @@ export class Runtime<Model, Msg> {
   devices: Devices<Msg>
   runtimeContext: RuntimeContext<Msg>
   subscriptionsManager: SubscriptionsManager<Msg>
+  logStream: fs.WriteStream
 
   constructor({
     update,
@@ -98,7 +107,7 @@ export class Runtime<Model, Msg> {
     house,
     initialModel,
     runtimeContext,
-    extras: { interfaces },
+    extras: { interfaces, logPath },
   }: RuntimeSpec<Model, Msg> & { runtimeContext: RuntimeContext<Msg> } & {
     extras: Extras<Msg, Model>
   }) {
@@ -134,25 +143,47 @@ export class Runtime<Model, Msg> {
       s.bindModelChange(subscribeToModelChanged, unsubscribeFromModelChanged)
       s.build()
     })
+
+    this.logStream = fs.createWriteStream(logPath, {flags: 'a', encoding: 'utf8', autoClose: true})
   }
 
-  run() {
+  log(msg: string, payload: unknown, ts = new Date) {
+    this.logStream.write(JSON.stringify({msg, ts, payload}))
+    this.logStream.write('\n')
+  }
+
+  run(initialMsg?: Msg) {
+    if(initialMsg !== undefined) {
+      this.log('initialMsg', initialMsg)
+      this.log('initialModel', this.model)
+      const [nextModel, cmd] = this.update(this.model, initialMsg)
+      this.log('model', nextModel)
+      this.model = nextModel
+    }
+
     console.log('initial model', this.model)
     this.bus.emit('modelChanged', this.model)
     this.subscriptionsManager.updateSubs(this.subscriptions(this.model))
 
     const nextHouse = this.house(this.model)
+    console.log("run - next house")
+    console.dir(nextHouse, {depth: null})
+    this.log('firstHouse', nextHouse)
     this.houseState = this.reifyNode(this.runtimeContext, nextHouse, Empty)
+    this.log('firstHouseState', this.houseState)
   }
 
   dispatchMessage(msg: Msg) {
+    this.log('dm.msg', msg)
     const [nextModel, cmd] = this.update(this.model, msg)
+    console.log('dispatchMessage: ', msg)
     if (equal(this.model, nextModel)) {
       console.log('no change to model, no effect')
       return
     }
-    console.log('model after update', this.model)
+    this.log('dm.model', nextModel)
     this.model = nextModel
+    console.log('model after update', this.model)
     this.bus.emit('modelChanged', this.model)
 
     this.subscriptionsManager.updateSubs(this.subscriptions(nextModel))
@@ -160,11 +191,13 @@ export class Runtime<Model, Msg> {
     // TODO handle cmds
 
     let nextHouse = this.house(nextModel)
+    this.log('dm.house', nextHouse)
     this.houseState = this.reifyNode(
       this.runtimeContext,
       nextHouse,
       this.houseState,
     )
+    this.log('dm.houseState', this.houseState)
   }
 
   reifyNode<Msg>(

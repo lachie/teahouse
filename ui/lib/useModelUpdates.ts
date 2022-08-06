@@ -19,8 +19,9 @@ export function useModelUpdates<Model>(decoder: t.Decoder<unknown, Model>) {
   const setModel = (model: Model) => setState({ model })
 
   useEffect(() => {
+    console.log('in useEffect, listening: ', listening)
     if (!listening) {
-      const events = new EventSource('http://192.168.86.28:3030/model-updates')
+      const events = new EventSource('http://bops.home:3030/model-updates')
       events.onopen = () => {
         setListening(true)
       }
@@ -35,9 +36,8 @@ export function useModelUpdates<Model>(decoder: t.Decoder<unknown, Model>) {
         setListening(true)
       }
       events.onerror = (...args: any[]) => {
-        if (events.readyState === EventSource.CLOSED) {
-          setListening(false)
-        }
+        events.close()
+        setListening(false)
         setErrors(JSON.stringify(args))
       }
       setListening(true)
