@@ -8,10 +8,11 @@ import { ZButton, ZButtonNode } from './zButton'
 import { ZScene, ZSceneNode } from './zScene'
 import { MqttSensor, MqttSensorNode } from './mqttSensor'
 import { Mqtt } from '../effects/mqtt'
+import { TelegramMessage, TelegramMessageNode } from './telegramBot'
 
 export { RFLight, PersonDetector, Metrics, ZLight, ZScene }
 
-type DeviceNode<Msg> = RFLightNode | ZLightNode | PersonDetectorNode<Msg> | MetricsNode | ZButtonNode<Msg> | ZSceneNode | MqttSensorNode<Msg>
+type DeviceNode<Msg> = RFLightNode | ZLightNode | PersonDetectorNode<Msg> | MetricsNode | ZButtonNode<Msg> | ZSceneNode | MqttSensorNode<Msg> | TelegramMessageNode
 type DeviceType<Msg> = DeviceNode<Msg>['type']
 type DeviceList<Msg> = Record<DeviceType<Msg>, Device<DeviceNode<Msg>, Msg>>
   // [k: string]: Device<DeviceNode<Msg>, Msg>
@@ -28,7 +29,8 @@ export class Devices<Msg> extends Device<DeviceNode<Msg>, Msg> {
       zButton: new ZButton(),
       zScene: new ZScene(),
       metrics: new Metrics(),
-      mqttSensor: new MqttSensor()
+      mqttSensor: new MqttSensor(),
+      telegramMessage: new TelegramMessage()
     }
   }
   choose(d: Node): Device<DeviceNode<Msg>, Msg> {

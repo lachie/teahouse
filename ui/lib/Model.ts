@@ -30,6 +30,7 @@ export const ModelT = t.type({
     bedroom: RoomModelT,
   }),
   doorbell: t.boolean,
+  doorbellBlink: t.boolean,
   date: tt.DateFromISOString,
   hour: t.number,
   hourLate: t.boolean,

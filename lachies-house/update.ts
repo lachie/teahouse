@@ -26,6 +26,10 @@ export const update = (model: Model, msg: Msg): [Model, Command<Msg>] =>
       setValue(model, key, value),
       CmdNone,
     ])
+    .with({ type: 'set-values' }, ({keyValues}) => [
+      setValues(model, keyValues),
+      CmdNone,
+    ])
     .with({ type: 'clear-value' }, ({key}) => [
       setValue(model, key, undefined),
       CmdNone,
@@ -54,6 +58,8 @@ export const update = (model: Model, msg: Msg): [Model, Command<Msg>] =>
     .with({type: 'set-zigbee-event'}, (msg) => [updateZigbeeEvent(model, msg), CmdNone])
     .with({ type: 'toggle-light' }, (msg) => [toggleLight(model, msg), CmdNone])
     .exhaustive()
+
+const setValues = (model: Model, kvs: readonly [Path,unknown][]): Model => kvs.reduce((model,[key,value]) => setValue(model,key,value), model)
 
 const setValue = (model: Model, key: Path, value: unknown): Model => {
   if(value === undefined) {

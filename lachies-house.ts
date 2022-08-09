@@ -50,6 +50,7 @@ import { update } from './lachies-house/update'
 import { ZButton } from './devices/zButton'
 import { hashMap, hashMapT } from './util/hashMap'
 import { ZPresence, ZTemp } from './devices/zSensor'
+import { TelegramMessage } from './devices/telegramBot'
 
 const modelCachePath = path.resolve(__dirname, './model.json')
 const logPath = path.resolve(__dirname, './log.json')
@@ -152,6 +153,7 @@ const frontdoor = (model: Model): Container<Msg> => {
       'frontdoor/button',
       SetConst('doorbell', true),
     ),
+    (model.doorbell ? TelegramMessage.make("doorbell","doorbell!") : undefined)
   )
 }
 
@@ -182,7 +184,7 @@ const backroom = (room: RoomModel, model: Model): Container<Msg> => {
     '3_single': 'daylight',
   })
 
-  const scene = model.doorbell ? 'doorbell' : room.scene
+  const scene = model.doorbellBlink ? 'doorbell' : room.scene
   const payload = hashMapT<ZLightPayload>({
     off: { state: 'OFF' },
     doorbell: {
@@ -257,7 +259,7 @@ const playroom = (room: RoomModel, model: Model): Container<Msg> => {
     '2_single': 'morning',
     '3_single': 'daylight',
   })
-  const scene = model.doorbell ? 'doorbell' : room.scene
+  const scene = model.doorbellBlink ? 'doorbell' : room.scene
   const scenes = hashMapT<ZLightPayload>({
     off: { state: 'OFF' },
     doorbell: {
@@ -318,6 +320,6 @@ runtime(
     subscriptions,
     initialModel,
   },
-  { mqttClient, influxClient, interfaces, logPath },
+  { mqttClient, influxClient, interfaces, logPath, secrets },
   SetHour(new Date())
 )

@@ -1,30 +1,30 @@
-export class Updater<T> {
-  taggers: Record<string, T[]>
+export class Updater<S> {
+  subs: Record<string, S[]>
   constructor(
-    readonly added: (tagger: T) => void,
-    readonly removed: (tagger: T) => void,
-    readonly subToString: (t: T) => string,
+    readonly added: (s: S) => void,
+    readonly removed: (s: S) => void,
+    readonly key: (s: S) => string,
   ) {
-    this.taggers = {}
+    this.subs = {}
   }
 
-  update(subs: T[]) {
-    const newTaggers: Record<string, T[]> = subs.reduce(
-      (taggers: Record<string, T[]>, tagger: T) => (
-        (taggers[this.subToString(tagger)] ||= []).push(tagger), taggers
+  update(subs: S[]) {
+    const newSubs: Record<string, S[]> = subs.reduce(
+      (subs: Record<string, S[]>, s: S) => (
+        (subs[this.key(s)] ||= []).push(s), subs
       ),
-      {} as Record<string, T[]>,
+      {} as Record<string, S[]>,
     )
 
-    const newKeys = Object.keys(newTaggers)
-    const oldKeys = Object.keys(this.taggers)
+    const newKeys = Object.keys(newSubs)
+    const oldKeys = Object.keys(this.subs)
 
-    oldKeys.filter((t) => !newKeys.includes(t)).flatMap(t => this.taggers[t]).forEach(this.removed)
+    oldKeys.filter((t) => !newKeys.includes(t)).flatMap(t => this.subs[t]).forEach(this.removed)
     newKeys
       .filter((t) => !oldKeys.includes(t))
-      .flatMap((t) => this.taggers[t])
+      .flatMap((t) => newSubs[t])
       .forEach(this.added)
 
-    this.taggers = newTaggers
+    this.subs = newSubs
   }
 }

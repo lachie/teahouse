@@ -1,6 +1,6 @@
 import type { NextPage } from 'next'
 import { Model, ModelT, RoomModel } from '../lib/Model'
-import { ClearValue, LightState, SetConst, SensorReading, SetLightOn, SetScene, ToggleLight } from '../lib/Msg'
+import { ClearValue, LightState, SetConsts, SensorReading, SetLightOn, SetScene, ToggleLight } from '../lib/Msg'
 import { useDispatchMsgTagger } from '../lib/useDispatchMsg'
 import classNames from 'classnames'
 import {
@@ -10,16 +10,24 @@ import {
   XCircleIcon,
   MoonIcon,
   BellIcon,
+  HomeIcon,
+  CloudIcon,
 } from '@heroicons/react/outline'
 import {
   BellIcon as SolidBellIcon,
 } from '@heroicons/react/solid'
 import { LightBulbOffIcon } from '../lib/LightBulbOffIcon'
+import { WiCloud, WiShowers } from 'react-icons/wi'
 import { useModelUpdates } from '../lib/useModelUpdates'
-import { ReactElement, ReactNode } from 'react'
+import { Sound } from '../components/Sound'
+import { ReactElement, ReactNode, useEffect } from 'react'
 import { Popover } from '@headlessui/react'
 
 import format from 'date-fns/format'
+import useSWR from 'swr'
+import { randomInt } from 'crypto'
+import { match } from 'assert'
+import { FullyKiosk, useFullyKiosk } from '../lib/useFullyKiosk'
 
 
 const colours = {
@@ -98,17 +106,17 @@ const RoomTemp = ({ readings }: RoomTempProps): ReactElement => {
 type RoomLineProps = {
   Icon?: ReactNode
   MiniSlot?: ReactNode
-  name: string
+  name: ReactNode
   Action?: ReactElement
 }
 const RoomLine = ({ Icon, MiniSlot, name, Action }: RoomLineProps): ReactElement =>
-  <div className="text-gray-600 flex flex-row justify-start py-6 min-w-full place-content-center">
+  <div className="text-gray-600 flex flex-row justify-start py-3 xl:py-6 min-w-full place-content-center">
     <div className="flex flex-row py-2 place-content-center">
       <div className="h-8 w-8 float-left mt-0.5 mr-3 ">
         {Icon}
       </div>
       <div className="w-16">
-        {MiniSlot}
+        {MiniSlot || ' '}
       </div>
       <span className="text-2xl text-gray-400 font-semibold">{name} </span>
     </div>
@@ -171,12 +179,72 @@ const playroomScenes: SceneSpec[] = [
 ]
 const Playroom = ({ model }: { model: RoomModel }) => <Room room="playroom" scenes={playroomScenes} model={model} />
 
-type FrontdoorProps = { model: Model }
-const Frontdoor = ({ model: { doorbell } }: FrontdoorProps) => {
-  const clearDoorbell = useDispatchMsgTagger(SetConst('doorbell', false))
+
+type FrontdoorProps = { model: Model, doorbell: boolean }
+const Frontdoor = ({ doorbell }: FrontdoorProps) => {
+  useFullyKiosk((fully: FullyKiosk) => {
+    if (doorbell) {
+      // fully.turnScreenOn()
+      fully.stopScreensaver()
+      // fully.setScreenBrightness(255)
+      fully.showToast("door bell!")
+    }
+  }, [doorbell])
+  const clearDoorbell = useDispatchMsgTagger(SetConsts([['doorbell', false], ['doorbellBlink', false]]))
   const Icon = doorbell ? <BellIcon className='h-8 w-8 text-red-500' /> : <BellIcon className='h-8 w-8 text-gray-400' />
   const Action = <button className={classNames(" rounded py-2 px-4 w-full flex flex-row content-center", { 'bg-gray-200': doorbell, 'border border-gray-400': !doorbell })} onClick={clearDoorbell}>{Icon}</button>
-  return <RoomLine name="frontdoor" Icon={Icon} Action={Action} />
+
+  return <>
+    {doorbell && <Sound sound="doorbell-1" />}
+    <RoomLine name="frontdoor" Icon={Icon} Action={Action} /></>
+}
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
+
+type WeatherDay = {
+  icon_descriptor: string
+  rain: { chance: number, amount: { min: number, max: number } }
+  temp_max: number
+  temp_min: number
+  short_text: string
+  extended_text: string
+  now: { temp_now: number }
+}
+type WeatherObservations = {
+  temp: number
+  temp_feels_like: number
+  humidity: number
+}
+type WeatherProps = {}
+const Weather = ({ }: WeatherProps): ReactElement => {
+  const { data, error } = useSWR("/api/bom", fetcher)
+
+  if (error) return <>Weather error {JSON.stringify(error)}</>
+  if (!data) return <>Weather loading...</>
+
+  const day = data.daily[0] as WeatherDay
+  const obs = data.observations as WeatherObservations
+
+  let Icon
+  switch(day.icon_descriptor) {
+    case 'shower':
+      Icon = WiShowers
+      break
+      default:
+        Icon = WiCloud
+  }
+
+  const summary = <div>
+    {day.short_text}&nbsp;
+    <span className="text-lg font-normal">
+      [{day.rain.chance}%, {day.rain.amount.min}&mdash;{day.rain.amount.max}mm]
+    </span>
+  </div>
+
+  const slot = <RoomTemp readings={{temperature: obs.temp, humidity: obs.humidity}} />
+  //  size="32" color="rgb(156 163 175)"
+  return <RoomLine Icon={Icon && <Icon className="h-8 w-8 text-gray-400"/>} MiniSlot={slot} name={summary} />
 }
 
 type ModelProps = { model: Model }
@@ -184,7 +252,8 @@ type ModelProps = { model: Model }
 const Rooms = ({ model }: ModelProps) => {
   return (
     <>
-      <Frontdoor model={model} />
+      <Weather />
+      <Frontdoor model={model} doorbell={model.doorbell} />
       <Backroom model={model.rooms.backroom}></Backroom>
       <Playroom model={model.rooms.playroom}></Playroom>
       <Office model={model.rooms.office}></Office>
@@ -233,25 +302,25 @@ const ModelUpdater = ({ render }: ModelUpdaterProps): ReactElement => {
 
 const Home: NextPage = () => {
   return (
-    <div className="bg-blue-300 min-h-screen md:pt-16">
-      <div className="container mx-auto md:max-w-2xl md:shadow-lg md:rounded-xl">
-        <header className="bg-purple-600 md:rounded-t-xl mx-auto h-16 md:h-32">
+          <ModelUpdater render={model => <>
+    <div className="bg-blue-300 min-h-screen 2xl:pt-16">
+      <div className="container mx-auto max-w-full 2xl:max-w-2xl 2xl:shadow-lg 2xl:rounded-xl">
+        <header className={classNames("2xl:rounded-t-xl mx-auto h-16 2xl:h-32", {"bg-purple-600": !model.doorbell, "bg-red-600": model.doorbell})}>
           <section className="flex items-center justify-center min-h-full">
-            <div className=" text-center text-white text-3xl font-semibold">
-              Teahouse
+            <div className="text-center text-white text-3xl font-semibold flex flex-row">
+              T<HomeIcon className="w-8 h-8" />
             </div>
           </section>
         </header>
 
         <section className="mx-auto bg-white">
-          <ModelUpdater render={model => <>
             <DayProgress model={model} />
             <Rooms model={model} />
-          </>} />
         </section>
-        <footer className="bg-purple-400 md:rounded-b-xl mx-auto h-8"></footer>
+        <footer className="bg-purple-400 2xl:rounded-b-xl mx-auto h-8"></footer>
       </div>
     </div>
+          </>} />
   )
 }
 

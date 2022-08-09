@@ -1,5 +1,6 @@
 import { CronJob } from 'cron'
 import Emittery from 'emittery'
+import { Updater } from './updater'
 
 type Every = string
 type Tagger<Msg> = (a: Date) => Msg
@@ -17,63 +18,35 @@ export const Cron = <Msg>(every: Every, tagger: Tagger<Msg>): Cron<Msg> => ({
 })
 
 export class CronEffect<Msg> {
-  taggers: Taggers<Msg> = {}
   cronjobs: Record<string, CronJob> = {}
-  bus = new Emittery()
+  updater: Updater<Cron<Msg>>
   constructor(readonly sendToApp: (m: Msg) => void) {
-    this.bus.on('tick', (cronTime: string) => this.cronTick(cronTime))
+    this.updater = new Updater(this.added.bind(this), this.removed.bind(this), this.subToString.bind(this))
   }
+
+  added({ every, tagger }: Cron<Msg>) {
+    this.cronjobs[every] = new CronJob({
+      cronTime: every,
+      onTick: () => {
+        const now = new Date()
+        this.sendToApp(tagger(now))
+      },
+      start: true,
+    })
+  }
+
+  removed({ every }: Cron<Msg>) {
+    this.cronjobs[every]?.stop()
+    delete this.cronjobs[every]
+    // delete this.taggers[every]
+  }
+  subToString({every}: Cron<Msg>): string { return every }
 
   isSub(sub: { type: string }): sub is Cron<Msg> {
     return sub.type == 'cron'
   }
 
-  cronTick(cronTime: string) {
-    const taggers = this.taggers[cronTime]
-    const now = new Date()
-    for (const tagger of taggers) {
-      console.log('CronEffect sendToApp', tagger(now))
-      this.sendToApp(tagger(now))
-    }
-  }
-
   update(subs: Cron<Msg>[]) {
-    const newTaggers = subs.reduce(
-      (taggers: Taggers<Msg>, { every, tagger }: Cron<Msg>) => (
-        (taggers[every] ||= []).push(tagger), taggers
-      ),
-      {},
-    )
-    const newCronTimes = Object.keys(newTaggers)
-
-    const makeCronJob = (cronTime: string): CronJob => {
-      return new CronJob({
-        cronTime,
-        onTick: () => {
-          this.bus.emit('tick', cronTime)
-        },
-        start: true,
-      })
-    }
-
-    const oldCronTimes = Object.keys(this.taggers)
-
-    oldCronTimes
-      .filter((t) => !newCronTimes.includes(t))
-      .map((t) => {
-        this.cronjobs[t].stop()
-      })
-    this.cronjobs = newCronTimes
-      .filter((t) => !oldCronTimes.includes(t))
-      .reduce<Record<string, CronJob>>(
-        (cronjobs, t) => ((cronjobs[t] = makeCronJob(t)), cronjobs),
-        {},
-      )
-
-    this.taggers = newTaggers
-  }
-
-  key(sub: Cron<Msg>): string {
-    return sub.tagger.toString()
+    this.updater.update(subs)
   }
 }

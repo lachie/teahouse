@@ -78,9 +78,20 @@ export type SetValue = t.TypeOf<typeof SetValueT>
 export const SetValue = (key: Path) => (value: unknown): SetValue => ({type: 'set-value', key, value})
 export const SetConst = (key: Path, value: unknown) => (..._: unknown[]): SetValue => ({type: 'set-value', key, value})
 
+const zip = <A,B>(as: A[], bs: B[]): [A,B][] => as.map((a,i) => [a,bs[i]])
+export const SetValuesT = t.type({type: t.literal('set-values'), keyValues: t.readonlyArray(t.tuple([ImmutablePath, t.unknown]))})
+export type SetValues = t.TypeOf<typeof SetValuesT>
+export const SetValues = (keys: Path[]) => (values: unknown[]): SetValues => ({type: 'set-values', keyValues: zip(keys,values)})
+export const SetConsts = (keyValues: [Path,unknown][]) => (..._: unknown[]): SetValues => ({type: 'set-values', keyValues})
+
 export const ClearValueT = t.type({type: t.literal('clear-value'), key: ImmutablePath})
 export type ClearValue = t.TypeOf<typeof ClearValueT>
 export const ClearValue = (key: Path): ClearValue => ({type: 'clear-value', key})
+
+
+export const ToggleBoolT = t.type({type: t.literal('toggle-bool'), key: t.string})
+export type ToggleBool = t.TypeOf<typeof ToggleBoolT>
+export const ToggleBool = (key: string) => (): ToggleBool => ({type: 'toggle-bool', key})
 
 export const LightStateT = t.keyof({ on: null, off: null, detect: null })
 export type LightState = t.TypeOf<typeof LightStateT>
@@ -129,7 +140,9 @@ export const SetZigbeeEvent = (key: string, data: Record<string,unknown>): SetZi
 
 export const MsgT = t.union([
   SetValueT,
+  SetValuesT,
   ClearValueT,
+  ToggleBoolT,
   SetOccupancyT,
   SetSceneT,
   SetSensorRawT,

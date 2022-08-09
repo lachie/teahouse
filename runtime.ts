@@ -19,6 +19,8 @@ import equal from 'deep-equal'
 import { InterfaceFactory } from './interfaces'
 import * as fs from 'node:fs';
 
+export type Secrets = Record<string,Record<string,string>>
+
 export class RuntimeContext<Msg> {
   constructor(
     readonly key: string[],
@@ -26,6 +28,7 @@ export class RuntimeContext<Msg> {
     readonly influxClient: InfluxWriteApi,
     readonly subMgr: SubscriptionManager,
     readonly schedMgr: ScheduleManager<Msg>,
+    readonly secrets: Secrets,
     public dispatchMessage: (m: Msg) => void = (m: Msg) => {},
   ) {}
 
@@ -36,6 +39,7 @@ export class RuntimeContext<Msg> {
       this.influxClient,
       this.subMgr.push(key),
       this.schedMgr.push(key),
+      this.secrets,
       this.dispatchMessage,
     )
   }
@@ -59,6 +63,7 @@ type Extras<Msg, Model> = {
   influxClient: InfluxWriteApi
   interfaces: InterfaceFactory<Msg, Model>[],
   logPath: string
+  secrets: Secrets
 }
 
 // the main entrypoint for user's house scripts
@@ -80,6 +85,7 @@ export function runtime<Msg, Model>(
     influxClient,
     subscriptionManager,
     scheduleManager,
+    extras.secrets,
   )
 
   const rt = new Runtime({ ...spec, runtimeContext, extras })

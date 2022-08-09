@@ -15,6 +15,7 @@
     "@heroicons/react": "^1.0.4",
     "classnames": "^2.3.1",
     "fp-ts": "^2.11.4",
+    "howler": "^2.2.3",
     "io-ts": "^2.2.16",
     "io-ts-types": "^0.5.16",
     "ky": "^0.28.5",
@@ -23,10 +24,13 @@
     "next": "11.1.2",
     "react": "17.0.2",
     "react-dom": "17.0.2",
+    "react-howler": "^5.2.0",
+    "react-icons": "^4.4.0",
     "swr": "^1.0.1"
   },
   "devDependencies": {
     "@types/react": "17.0.27",
+    "@types/react-howler": "^5.2.0",
     "autoprefixer": "^10.3.7",
     "eslint": "7.32.0",
     "eslint-config-next": "11.1.2",
