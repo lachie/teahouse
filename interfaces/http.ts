@@ -17,11 +17,12 @@ export default class HttpInterfaceFactory<Msg, Model> extends InterfaceFactory<
     super()
   }
   build() {
-    const { dispatchMessage, getModel, subToModelChange, unsubToModelChange } =
+    const { dispatchMessage, getModel, getHouseState, subToModelChange, unsubToModelChange } =
       this
     if (
       dispatchMessage === undefined ||
       getModel === undefined ||
+      getHouseState === undefined ||
       subToModelChange === undefined ||
       unsubToModelChange === undefined
     ) {
@@ -79,6 +80,9 @@ export default class HttpInterfaceFactory<Msg, Model> extends InterfaceFactory<
     })
     app.get('/model', (req, res) => {
       res.json(getModel())
+    })
+    app.get('/house', (req, res) => {
+      res.json(getHouseState())
     })
 
     app.listen(this.port, () => {

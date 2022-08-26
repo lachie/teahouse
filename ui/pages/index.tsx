@@ -1,6 +1,6 @@
 import type { NextPage } from 'next'
-import { Model, ModelT, RoomModel } from '../lib/Model'
-import { ClearValue, LightState, SetConsts, SensorReading, SetLightOn, SetScene, ToggleLight } from '../lib/Msg'
+import { Model, ModelT, RoomModel, doorbellRinging } from '../lib/Model'
+import { ClearValue, LightState, SetConsts, SensorReading, SetLightOn, SetScene, ToggleLight, PushEvent } from '../lib/Msg'
 import { useDispatchMsgTagger } from '../lib/useDispatchMsg'
 import classNames from 'classnames'
 import {
@@ -17,7 +17,7 @@ import {
   BellIcon as SolidBellIcon,
 } from '@heroicons/react/solid'
 import { LightBulbOffIcon } from '../lib/LightBulbOffIcon'
-import { WiCloud, WiShowers } from 'react-icons/wi'
+import { WiCloud, WiDaySunny, WiDaySunnyOvercast, WiShowers } from 'react-icons/wi'
 import { useModelUpdates } from '../lib/useModelUpdates'
 import { Sound } from '../components/Sound'
 import { ReactElement, ReactNode, useEffect } from 'react'
@@ -28,6 +28,7 @@ import useSWR from 'swr'
 import { randomInt } from 'crypto'
 import { match } from 'assert'
 import { FullyKiosk, useFullyKiosk } from '../lib/useFullyKiosk'
+import { getHostFromReq, HostContext, HostSpec } from '../lib/getHostFromReq'
 
 
 const colours = {
@@ -157,9 +158,10 @@ function Room<Model extends SceneModel>({ model, room, scenes }: RoomProps<Model
 
 const officeScenes: SceneSpec[] = [
   { scene: 'off', Icon: XCircleIcon },
-  { scene: 'morning', colour: 'amber' },
+  { scene: 'dim', colour: 'amber' },
   { scene: 'morning2', colour: 'amber' },
-  { scene: 'daylight', colour: 'amberbright' },
+  { scene: 'bright', colour: 'amberbright' },
+  { scene: 'work', colour: 'sky' },
   { scene: 'purple' },
   { scene: 'blue' },
 ]
@@ -167,30 +169,39 @@ const Office = ({ model }: { model: RoomModel }) => <Room room="office" scenes={
 
 const backroomScenes: SceneSpec[] = [
   { scene: 'off', Icon: XCircleIcon },
-  { scene: 'morning', colour: 'amber' },
-  { scene: 'daylight', colour: 'amberbright' },
+  { scene: 'dim', colour: 'amber' },
+  { scene: 'bright', colour: 'amberbright' },
+  { scene: 'work', colour: 'sky' },
 ]
 const Backroom = ({ model }: { model: RoomModel }) => <Room room="backroom" scenes={backroomScenes} model={model} />
 
 const playroomScenes: SceneSpec[] = [
   { scene: 'off', Icon: XCircleIcon },
-  { scene: 'morning', colour: 'amber' },
-  { scene: 'daylight', colour: 'amberbright' },
+  { scene: 'dim', colour: 'amber' },
+  { scene: 'bright', colour: 'amberbright' },
+  { scene: 'work', colour: 'sky' },
 ]
 const Playroom = ({ model }: { model: RoomModel }) => <Room room="playroom" scenes={playroomScenes} model={model} />
 
+const kidRoomScenes: SceneSpec[] = [
+  { scene: 'off', Icon: XCircleIcon },
+  { scene: 'dim', colour: 'amber' },
+  { scene: 'bright', colour: 'amberbright' },
+  { scene: 'work', colour: 'sky' },
+]
+const SamsRoom = ({ model }: { model: RoomModel }) => <Room room="sams-room" scenes={kidRoomScenes} model={model} />
+const PipersRoom = ({ model }: { model: RoomModel }) => <Room room="pipers-room" scenes={kidRoomScenes} model={model} />
 
 type FrontdoorProps = { model: Model, doorbell: boolean }
 const Frontdoor = ({ doorbell }: FrontdoorProps) => {
   useFullyKiosk((fully: FullyKiosk) => {
     if (doorbell) {
-      // fully.turnScreenOn()
       fully.stopScreensaver()
-      // fully.setScreenBrightness(255)
       fully.showToast("door bell!")
     }
   }, [doorbell])
-  const clearDoorbell = useDispatchMsgTagger(SetConsts([['doorbell', false], ['doorbellBlink', false]]))
+  // const clearDoorbell = useDispatchMsgTagger(SetConsts([['doorbell', false], ['doorbellBlink', false]]))
+  const clearDoorbell = useDispatchMsgTagger(PushEvent('doorbellEvents', 'cancelled'))
   const Icon = doorbell ? <BellIcon className='h-8 w-8 text-red-500' /> : <BellIcon className='h-8 w-8 text-gray-400' />
   const Action = <button className={classNames(" rounded py-2 px-4 w-full flex flex-row content-center", { 'bg-gray-200': doorbell, 'border border-gray-400': !doorbell })} onClick={clearDoorbell}>{Icon}</button>
 
@@ -209,7 +220,7 @@ type WeatherDay = {
   temp_min: number
   short_text: string
   extended_text: string
-  now: { temp_now: number }
+  now: { temp_now: number, now_label: string, temp_later: number, later_label: string }
 }
 type WeatherObservations = {
   temp: number
@@ -227,24 +238,31 @@ const Weather = ({ }: WeatherProps): ReactElement => {
   const obs = data.observations as WeatherObservations
 
   let Icon
-  switch(day.icon_descriptor) {
+  switch (day.icon_descriptor) {
     case 'shower':
       Icon = WiShowers
       break
-      default:
-        Icon = WiCloud
+    case 'sunny':
+      Icon = WiDaySunny
+      break
+    case 'mostly_sunny':
+      Icon = WiDaySunnyOvercast
+      break
+    default:
+      Icon = WiCloud
   }
 
   const summary = <div>
     {day.short_text}&nbsp;
-    <span className="text-lg font-normal">
-      [{day.rain.chance}%, {day.rain.amount.min}&mdash;{day.rain.amount.max}mm]
+    <span className="text-sm font-normal">
+      [{day.rain.chance}%, {day.rain.amount.min}&ndash;{day.rain.amount.max}mm]
+      [{day.now.now_label} {degSym(day.now.temp_now)}, {day.now.later_label} {degSym(day.now.temp_later)}]
     </span>
   </div>
 
-  const slot = <RoomTemp readings={{temperature: obs.temp, humidity: obs.humidity}} />
+  const slot = <RoomTemp readings={{ temperature: obs.temp, humidity: obs.humidity }} />
   //  size="32" color="rgb(156 163 175)"
-  return <RoomLine Icon={Icon && <Icon className="h-8 w-8 text-gray-400"/>} MiniSlot={slot} name={summary} />
+  return <RoomLine Icon={Icon && <Icon className="h-8 w-8 text-gray-400" />} MiniSlot={slot} name={summary} />
 }
 
 type ModelProps = { model: Model }
@@ -253,10 +271,12 @@ const Rooms = ({ model }: ModelProps) => {
   return (
     <>
       <Weather />
-      <Frontdoor model={model} doorbell={model.doorbell} />
-      <Backroom model={model.rooms.backroom}></Backroom>
+      <Frontdoor model={model} doorbell={doorbellRinging(model)} />
       <Playroom model={model.rooms.playroom}></Playroom>
+      <Backroom model={model.rooms.backroom}></Backroom>
       <Office model={model.rooms.office}></Office>
+      <SamsRoom model={model.rooms['sams-room']}></SamsRoom>
+      <PipersRoom model={model.rooms['pipers-room']}></PipersRoom>
     </>
   )
 }
@@ -284,9 +304,10 @@ const DayProgress = ({ model }: ModelProps) => {
 
 type ModelUpdaterProps = {
   render: (m: Model) => ReactNode
+  host: HostSpec
 }
-const ModelUpdater = ({ render }: ModelUpdaterProps): ReactElement => {
-  const { model, errors } = useModelUpdates(ModelT)
+const ModelUpdater = ({ render, host }: ModelUpdaterProps): ReactElement => {
+  const { model, errors } = useModelUpdates(ModelT, host)
 
   console.log('m', model)
   console.log('e', errors)
@@ -296,32 +317,38 @@ const ModelUpdater = ({ render }: ModelUpdaterProps): ReactElement => {
 
   const comp = render(model)
 
-  return <>{comp ? comp : null}</>
+
+  return comp ? <HostContext.Provider value={host}>{comp}</HostContext.Provider > : <></>
 }
 
 
-const Home: NextPage = () => {
+type HomeProps = { host: HostSpec }
+const Home: NextPage<HomeProps> = ({ host }: HomeProps) => {
   return (
-          <ModelUpdater render={model => <>
-    <div className="bg-blue-300 min-h-screen 2xl:pt-16">
-      <div className="container mx-auto max-w-full 2xl:max-w-2xl 2xl:shadow-lg 2xl:rounded-xl">
-        <header className={classNames("2xl:rounded-t-xl mx-auto h-16 2xl:h-32", {"bg-purple-600": !model.doorbell, "bg-red-600": model.doorbell})}>
-          <section className="flex items-center justify-center min-h-full">
-            <div className="text-center text-white text-3xl font-semibold flex flex-row">
-              T<HomeIcon className="w-8 h-8" />
-            </div>
-          </section>
-        </header>
+    <ModelUpdater host={host} render={model => <>
+      <div className="bg-blue-300 min-h-screen 2xl:pt-16">
+        <div className="container mx-auto max-w-full 2xl:max-w-2xl 2xl:shadow-lg 2xl:rounded-xl">
+          <header className={classNames("2xl:rounded-t-xl mx-auto h-16 2xl:h-32", { "bg-purple-600": !model.doorbell, "bg-red-600": model.doorbell })}>
+            <section className="flex items-center justify-center min-h-full">
+              <div className="text-center text-white text-3xl font-semibold flex flex-row">
+                T<HomeIcon className="w-8 h-8" />
+              </div>
+            </section>
+          </header>
 
-        <section className="mx-auto bg-white">
+          <section className="mx-auto bg-white">
             <DayProgress model={model} />
             <Rooms model={model} />
-        </section>
-        <footer className="bg-purple-400 2xl:rounded-b-xl mx-auto h-8"></footer>
+          </section>
+          <footer className="bg-purple-400 2xl:rounded-b-xl mx-auto h-8"></footer>
+        </div>
       </div>
-    </div>
-          </>} />
+    </>} />
   )
 }
+
+Home.getInitialProps = ({ req }) => {
+  return { host: getHostFromReq(req) }
+};
 
 export default Home

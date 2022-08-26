@@ -3,6 +3,7 @@ import * as tt from 'io-ts-types'
 import { LightStateT, SensorReadingT } from './Msg'
 import { addDays, differenceInCalendarDays, nextDay } from 'date-fns'
 import * as SunCalc from 'suncalc'
+import * as immutable from 'object-path-immutable'
 
 export const RoomModelT = t.type({
   occupied: t.boolean,
@@ -14,7 +15,10 @@ export type RoomModel = t.TypeOf<typeof RoomModelT>
 export const BackroomModelT = RoomModelT
 export type BackroomModel = RoomModel
 
-export const SunProgress = t.tuple([t.number,t.keyof({day:null, night: null})])
+export const SunProgress = t.tuple([
+  t.number,
+  t.keyof({ day: null, night: null }),
+])
 export type SunProgress = t.TypeOf<typeof SunProgress>
 
 /*
@@ -25,32 +29,41 @@ export const ModelT = t.type({
     playroom: RoomModelT,
     backroom: RoomModelT,
     office: RoomModelT,
-    sams_room: RoomModelT,
-    pipers_room: RoomModelT,
+    'sams-room': RoomModelT,
+    'pipers-room': RoomModelT,
     bedroom: RoomModelT,
   }),
   doorbell: t.boolean,
   doorbellBlink: t.boolean,
+  doorbellEvents: t.array(
+    t.tuple([
+      tt.DateFromISOString,
+      t.keyof({ triggered: null, cancelled: null }),
+    ]),
+  ),
   date: tt.DateFromISOString,
   hour: t.number,
   hourLate: t.boolean,
   kidweek: t.boolean,
   sunProgress: SunProgress,
-  daylightProgress: t.number
+  daylightProgress: t.number,
 })
 export type Model = t.TypeOf<typeof ModelT>
 
 export const modelZero = {
-        rooms: {
-          playroom: { lightOn: 'detect', occupied: false },
-          office: {},
-          backroom: {},
-        },
-      }
+  rooms: {
+    playroom: { lightOn: 'detect', occupied: false },
+    office: {},
+    backroom: {},
+  },
+}
 
 type RoomId = keyof Model['rooms']
 
-const RoomCacheT = t.partial({ scene: t.string, sensors: t.record(t.string, SensorReadingT) })
+const RoomCacheT = t.partial({
+  scene: t.string,
+  sensors: t.record(t.string, SensorReadingT),
+})
 
 export const ModelCacheT = t.type({
   rooms: t.type({
@@ -79,23 +92,40 @@ export function isHourLate(date: Date): boolean {
 export function sunProgress(date: Date): SunProgress {
   const latitude = -33.756171
   const longitude = 151.214681
-  
+
   const t = SunCalc.getTimes(date, latitude, longitude)
 
   console.log(t)
 
   const { sunrise, sunset } = t
 
-  const toUnit = (v: Date, min: Date, max: Date): number => (v.getTime()-min.getTime()) / (max.getTime()-min.getTime())
+  const toUnit = (v: Date, min: Date, max: Date): number =>
+    (v.getTime() - min.getTime()) / (max.getTime() - min.getTime())
 
   if (date >= sunrise) {
     if (date < sunset) {
       return [toUnit(date, sunrise, sunset), 'day']
     }
-    const { sunrise: nextSunrise } = SunCalc.getTimes(addDays(date, 1), latitude, longitude)
+    const { sunrise: nextSunrise } = SunCalc.getTimes(
+      addDays(date, 1),
+      latitude,
+      longitude,
+    )
     return [toUnit(date, sunset, nextSunrise), 'night']
   } else {
-    const { sunset: prevSunset } = SunCalc.getTimes(addDays(date, -1), latitude, longitude)
+    const { sunset: prevSunset } = SunCalc.getTimes(
+      addDays(date, -1),
+      latitude,
+      longitude,
+    )
     return [toUnit(date, prevSunset, sunrise), 'night']
   }
 }
+
+
+export const doorbellRinging = ({doorbellEvents}: Model): boolean => {
+  const last = doorbellEvents[doorbellEvents.length-1]
+  if(last !== undefined) { return last[1] == 'triggered'}
+  return false
+}
+export const doorbellBlinking = (model: Model): boolean => doorbellRinging(model) ? model.doorbellBlink : false

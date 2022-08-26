@@ -10,23 +10,34 @@ const coolTemp = 250
 const cosyTemp = warmTemp
 const noonTemp = coolTemp * 1.2
 
+type LightRange = 'cosy' | 'work'
+
 type ZLightDefinition = {
-    warm: number,
-    cool: number,
-    cosy: number
-    noon: number
+    warmest: number,
+    coolest: number,
+    ranges: Record<LightRange, [number,number]> // [warm,cool]
 }
 
-const lightDefs: Record<string,ZLightDefinition> = {
+export type LightKind = 'ikea' | 'ikea-spot'
+const lightDefs: Record<LightKind,ZLightDefinition> = {
   'ikea': {
-    warm: 250,
-    cool: 454,
-    cosy: cosyTemp,
-    noon: noonTemp
+    warmest: 454,
+    coolest: 250,
+    ranges: {
+      cosy: [1,1],
+      work: [0.5,1],
+    }
+  },
+  'ikea-spot': {
+    warmest: 454,
+    coolest: 250,
+    ranges: {
+      cosy: [0.85,1],
+      work: [0.5,1],
+    }
   }
 }
 
-export type LightKind = keyof typeof lightDefs
 
 type ZColour = {
     r: number, g: number, b: number
@@ -39,7 +50,7 @@ export type ZLightPayload = {
   brightness: number
   color: ZColour 
   color_temp: ZColourTemp
-  white: [number,number]
+  white: [number,number,LightRange]
 }
 export type PartialPayload = Partial<ZLightPayload>
 
@@ -66,12 +77,14 @@ export class ZLight<Msg> extends ZDevice<Msg, PartialPayload, ZLightNode> {
     const def = lightDefs[kind]
     let p = {}
     if (payload.white !== undefined) {
-      const [brightness, prog] = payload.white
+      const [brightness, prog, rangeName] = payload.white
+      const [warmScale,coolScale] = def.ranges[rangeName]
+
       // const tempScale = sineNorm(def.cosy, def.noon)
-      const tempScale = sawNorm(def.cosy, def.noon)
-      console.log("brightness", brightness, "prog", prog)
-      console.log("def", def)
-      console.log("scaled", tempScale(prog))
+      const tempScale = sawNorm(def.warmest * warmScale, def.coolest * coolScale)
+
+      console.log(kind, "temp", prog, tempScale(prog), tempScale(0), tempScale(0.5), tempScale(1.0))
+
       p = {
         state: 'ON',
         brightness: 254 * brightness,

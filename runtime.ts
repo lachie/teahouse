@@ -133,6 +133,7 @@ export class Runtime<Model, Msg> {
 
     const dispatchMessage = this.dispatchMessage.bind(this)
     const getModel = () => this.model
+    const getHouseState = () => this.houseState
 
     const subscribeToModelChanged = (listener: (m: Model) => void) => {
       console.log('subscribing to model change')
@@ -146,6 +147,7 @@ export class Runtime<Model, Msg> {
     interfaces.forEach((s) => {
       s.bindDispatchMessage(dispatchMessage)
       s.bindGetModel(getModel)
+      s.bindGetHouseState(getHouseState)
       s.bindModelChange(subscribeToModelChanged, unsubscribeFromModelChanged)
       s.build()
     })

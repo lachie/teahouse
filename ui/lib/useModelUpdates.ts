@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react'
 import { map, mapLeft, match } from 'fp-ts/Either'
 import * as t from 'io-ts'
 import { failure } from 'io-ts/PathReporter'
+import { HostSpec } from './getHostFromReq'
 
 const mapErrors = mapLeft((errors: t.Errors) => failure(errors).join('\n'))
 
 type State<Model> = { model?: Model; errors?: string }
-export function useModelUpdates<Model>(decoder: t.Decoder<unknown, Model>) {
+export function useModelUpdates<Model>(decoder: t.Decoder<unknown, Model>, host: HostSpec) {
   const [state, setState] = useState<State<Model>>({
     model: undefined,
     errors: undefined,
@@ -18,10 +19,13 @@ export function useModelUpdates<Model>(decoder: t.Decoder<unknown, Model>) {
   const setErrors = (errors: string) => setState({ errors })
   const setModel = (model: Model) => setState({ model })
 
+  // 'http://bops.home:3030/model-updates'
+  const url = `${host.api}/model-updates`
+
   useEffect(() => {
     console.log('in useEffect, listening: ', listening)
     if (!listening) {
-      const events = new EventSource('http://bops.home:3030/model-updates')
+      const events = new EventSource(url)
       events.onopen = () => {
         setListening(true)
       }

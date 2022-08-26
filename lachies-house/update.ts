@@ -15,6 +15,7 @@ import {
   SetSensorRaw,
   SetZigbeeEvent,
   SetScene,
+  PushEvent,
 } from './Msg'
 
 /*
@@ -50,6 +51,7 @@ export const update = (model: Model, msg: Msg): [Model, Command<Msg>] =>
       updateSensorRaw(model, msg),
       CmdNone,
     ])
+    .with({type: 'push-event'}, (msg) => [pushEvent(model, msg), CmdNone])
     .with({ type: 'set-hour' }, (msg) => [updateModelDate(model, msg), CmdNone])
     .with({ type: 'set-light-on' }, (msg) => [
       updateLightOn(model, msg),
@@ -73,6 +75,8 @@ const toggleBool = (model: Model, key: Path): Model => {
   const value = immutable.get(model, key, false)
   return immutable.set(model, key, !value)
 }
+
+const pushEvent = (model: Model, {event, at, path}: PushEvent): Model => immutable.push(model, path, [at,event])
 
 const updateOccupancy = (
   model: Model,

@@ -88,6 +88,10 @@ export const ClearValueT = t.type({type: t.literal('clear-value'), key: Immutabl
 export type ClearValue = t.TypeOf<typeof ClearValueT>
 export const ClearValue = (key: Path): ClearValue => ({type: 'clear-value', key})
 
+export const PushEventT = t.type({type: t.literal('push-event'), path: ImmutablePath, event: t.string, at: tt.DateFromISOString})
+export type PushEvent = t.TypeOf<typeof PushEventT>
+export const PushEvent = (path: Path, event: string) => (): PushEvent => ({type: 'push-event', path, event, at: new Date})
+
 
 export const ToggleBoolT = t.type({type: t.literal('toggle-bool'), key: t.string})
 export type ToggleBool = t.TypeOf<typeof ToggleBoolT>
@@ -142,6 +146,7 @@ export const MsgT = t.union([
   SetValueT,
   SetValuesT,
   ClearValueT,
+  PushEventT,
   ToggleBoolT,
   SetOccupancyT,
   SetSceneT,

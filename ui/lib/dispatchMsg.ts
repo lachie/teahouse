@@ -1,7 +1,11 @@
 import ky from 'ky'
+import { HostSpec } from './getHostFromReq'
 import { Msg } from './Msg'
 
-export default async function dispatchMsg(m: Msg): Promise<void> {
-  const url = `http://bops.home:3030/msg`
+export default async function dispatchMsg(
+  host: HostSpec,
+  m: Msg,
+): Promise<void> {
+  const url = `${host.api}/msg`
   await ky.post(url, { json: m })
 }
