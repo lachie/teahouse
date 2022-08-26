@@ -4,3 +4,4 @@ secrets.json
 yarn-error.log
 !ui/lib
 model.json
+log.json
