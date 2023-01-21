@@ -2,6 +2,7 @@ import { HomeIcon } from "@heroicons/react/outline"
 import classNames from "classnames"
 import { ReactElement, ReactNode } from "react"
 import { ModelUpdater } from "../components/ModelUpdater"
+import { HostSpec } from "../lib/getHostFromReq"
 import { Model, ModelT } from "../lib/Model"
 
 export type StdLayoutLookProps = { children: ReactNode, alert?: boolean }
@@ -23,9 +24,9 @@ export const StdLayoutLook = ({ children, alert }: StdLayoutLookProps) => <div c
 </div>
 
 
-export type StdLayoutProps = { children: (model: Model) => ReactNode }
-const StdLayout = ({ children }: StdLayoutProps) =>
-    <ModelUpdater render={(model) => <StdLayoutLook alert={model.doorbell}>
+export type StdLayoutProps = { host: HostSpec, children: (model: Model) => ReactNode }
+const StdLayout = ({ children, host }: StdLayoutProps) =>
+    <ModelUpdater host={host} render={(model) => <StdLayoutLook alert={model.doorbell}>
         {children(model)}
     </StdLayoutLook>
     } />

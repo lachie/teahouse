@@ -5,6 +5,8 @@ export type HostSpec = {
   api: string
 }
 
+export type HostSpecProps = { host: HostSpec }
+
 export const HostContext = React.createContext<HostSpec>({api: ''});
 
 export function getHostFromReq(req?: IncomingMessage): HostSpec {

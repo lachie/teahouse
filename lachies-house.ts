@@ -1,64 +1,61 @@
 process.env.TZ = 'Australia/Sydney'
 import { match } from 'ts-pattern'
 
-import { Container, Room } from './house'
+import { Container, Room } from './src/house'
 
-import { ZLight } from './devices'
-import { ZLightPayload, ZLightNode } from './devices/zLight'
+import { ZLight } from './src/devices'
+import { ZLightPayload } from './src/devices/zLight'
 
-import { runtime } from './runtime'
-import { Batch, Sub, None } from './runtime/subscriptions'
-import { Cron } from './effects/cron'
+import { runtime } from './src/runtime'
+import { Batch, Sub } from './src/runtime/subscriptions'
+import { Cron } from './src/effects/cron'
 
 import * as mqtt from 'async-mqtt'
 import { InfluxDB } from '@influxdata/influxdb-client'
 
-import HttpInterfaceFactory from './interfaces/http'
+import HttpInterfaceFactory from './src/interfaces/http'
 
 import secrets from './secrets.json'
-import immutable from 'object-path-immutable'
 
 import {
   isHourLate,
   isKidWeek,
   Model,
+  People,
   ModelCache,
   ModelCacheT,
   RoomModel,
   modelZero,
   doorbellRinging,
   doorbellBlinking,
-} from './lachies-house/Model'
+} from './src/lachies-house/Model'
 import {
   Msg,
-  SetOccupancy,
   SetHour,
   MsgT,
-  SetLightOn,
-  ToggleLight,
-  LightState,
-  LightStates,
   SetSensorRaw,
-  SetZigbeeEvent,
   SetScene,
-  SetValue,
-  SetConst,
   ToggleBool,
-  SetConsts,
   PushEvent,
-} from './lachies-house/Msg'
-import { InterfaceFactory } from './interfaces'
+  SetConst,
+  SetValue,
+  SetSetValue,
+  SetDelValue,
+} from './src/lachies-house/Msg'
+import { InterfaceFactory } from './src/interfaces'
 import path from 'path/posix'
-import { ModelCacheFactory } from './interfaces/modelCache'
-import { Mqtt } from './effects/mqtt'
-import { update } from './lachies-house/update'
-import { ZButton } from './devices/zButton'
-import { hashMap, hashMapT } from './util/hashMap'
-import { ZPresence, ZTemp } from './devices/zSensor'
-import { TelegramMessage } from './devices/telegramBot'
+import { ModelCacheFactory } from './src/interfaces/modelCache'
+import { update } from './src/lachies-house/update'
+import { ZButton } from './src/devices/zButton'
+import { hashMap, hashMapT } from './src/util/hashMap'
+import { ZPresence, ZTemp } from './src/devices/zSensor'
+import { TelegramMessage } from './src/devices/telegramBot'
+import { Dhcp } from './src/effects/dhcp'
+import { Person } from './src/devices/person'
 
 const modelCachePath = path.resolve(__dirname, './model.json')
 const logPath = path.resolve(__dirname, './log.json')
+const oauthDBPath = path.resolve(__dirname, './oauthDB.json')
 
 const modelCacheFactory = new ModelCacheFactory<Model, ModelCache, Msg>(
   modelCachePath,
@@ -87,12 +84,15 @@ let initialModel: Model = modelCacheFactory.initialModel({
   doorbell: false,
   doorbellBlink: false,
   doorbellEvents: [],
+  userPresenceEvents: [],
   date: initialDate,
   hour: initialDate.getHours(),
   hourLate: isHourLate(initialDate),
   kidweek: isKidWeek(initialDate),
   sunProgress: [0, 'day'],
   daylightProgress: 0,
+  houseScene: 'none',
+  people: [],
   rooms: {
     playroom: {
       occupied: false,
@@ -127,32 +127,63 @@ let initialModel: Model = modelCacheFactory.initialModel({
   },
 })
 
-/*
- * subscriptions
- */
+// const mmm = (s: X): Y|undefined => match<X,Y>(s)
+
 const subscriptions = (model: Model): Sub<Msg> =>
   Batch([
     Sub(Cron('0 * * * * *', SetHour)),
     doorbellRinging(model) &&
       Sub(Cron('*/2 * * * * *', ToggleBool('doorbellBlink'))),
+    // Sub(
+    //   Dhcp((s: string): Msg | undefined =>
+    //     match<string, Msg | undefined>(s)
+    //       .with('3a:19:6e:65:3d:f3', PushEvent('userPresenceEvents', 'lachie'))
+    //       .otherwise(() => undefined),
+    //   ),
+    // ),
     // Sub(Mqtt('zigbee2mqtt/#', SetZigbeeEvent))
   ])
 
 /*
  * house
  */
+type HouseScenes = 'off' | 'none'
+type CommonAreaScenes = 'bedtime'
+type GlobalScenes = HouseScenes | 'doorbell'
+
+type PrivateArea<P> = P | HouseScenes
+type CommonArea<P> = P | GlobalScenes | CommonAreaScenes
+
 const house = (model: Model): Container<Msg> => ({
   type: 'house',
   key: 'house',
   children: [
+    global(model),
     frontdoor(model),
     playroom(model.rooms.playroom, model),
     backroom(model.rooms.backroom, model),
+    bedroom(model.rooms.bedroom, model),
     office(model.rooms.office, model),
     pipers_room(model.rooms['pipers-room'], model),
     sams_room(model.rooms['sams-room'], model),
   ],
 })
+
+const global = (model: Model): Container<Msg> => {
+  const person = (key: keyof typeof People) =>
+    Person.make(
+      key,
+      key,
+      People[key].macs,
+      SetSetValue('people', key),
+      SetDelValue('people', key),
+    )
+  return {
+    type: 'global',
+    key: 'global',
+    children: [person('dad'), person('piper'), person('sam')],
+  }
+}
 
 const frontdoor = (model: Model): Container<Msg> => {
   return Room(
@@ -167,6 +198,36 @@ const frontdoor = (model: Model): Container<Msg> => {
   )
 }
 
+const resolveSceneCommonArea = <RoomScenes>(
+  model: Model,
+  room: RoomModel,
+): RoomScenes | GlobalScenes => {
+  if (doorbellBlinking(model)) {
+    return 'doorbell'
+  }
+
+  if (room.scene !== undefined) {
+    return room.scene as unknown as RoomScenes
+  }
+
+  if (model.houseScene !== undefined) {
+    return model.houseScene
+  }
+
+  return 'none'
+}
+
+const resolveScenePrivateArea = <RoomScenes>(
+  _: Model,
+  room: RoomModel,
+): RoomScenes => {
+  const scene = room.scene
+  // TODO wat
+  if (scene === undefined) return 'none' as unknown as RoomScenes
+  // TODO parameterise RoomModel/RoomModelT
+  return room.scene as unknown as RoomScenes
+}
+
 const shortDelay = 30 * 1000
 const defaultDelay = 5 * 60 * 1000
 // DEV:
@@ -176,13 +237,12 @@ const defaultDelay = 5 * 60 * 1000
 const kidWeekNoLightsAfterHour = 21
 
 type NullPartial<X> = Partial<X> | undefined
-type Payloads = [NullPartial<ZLightPayload>, NullPartial<ZLightPayload>]
+type Payloads = [Partial<ZLightPayload>, Partial<ZLightPayload>]
 
+type BackroomScenes = 'dim' | 'bright' | 'work'
 const backroom = (room: RoomModel, model: Model): Container<Msg> => {
   const [prog, dayNight] = model.sunProgress
-  let temp = dayNight === 'day' ? prog : 1.0
-
-  console.log('backroom', room, model)
+  let progress = dayNight === 'day' ? prog : 1.0
 
   const buttons = hashMap({
     '1_single': 'off',
@@ -190,9 +250,9 @@ const backroom = (room: RoomModel, model: Model): Container<Msg> => {
     '3_single': 'bright',
   })
 
-  const scene = doorbellBlinking(model) ? 'doorbell' : room.scene
-  const [payload, payload2] = match<string | undefined, Payloads>(scene)
-    .with('off', () => [{ state: 'OFF' }, { state: 'OFF' }])
+  const scene = resolveSceneCommonArea<BackroomScenes>(model, room)
+  const [payload, payload2] = match<CommonArea<BackroomScenes>, Payloads>(scene)
+    .with('off', 'none', () => [{ state: 'OFF' }, { state: 'OFF' }])
     .with('doorbell', () => [
       {
         state: 'ON',
@@ -207,37 +267,37 @@ const backroom = (room: RoomModel, model: Model): Container<Msg> => {
     ])
     .with('dim', () => [
       {
-        white: [0.3, temp, 'cosy'],
+        white: { brightness: 0.3, progress, range: 'cosy' },
       },
       {
-        white: [0.3 * 0.2, temp, 'cosy'],
+        white: { brightness: 0.3 * 0.2, progress, range: 'cosy' },
       },
     ])
-    .with('bright', () => [
+    .with('bright', 'bedtime', () => [
       {
-        white: [1.0, temp, 'cosy'],
+        white: { brightness: 1.0, progress, range: 'cosy' },
       },
       {
-        white: [1.0 * 0.15, temp, 'cosy'],
+        white: { brightness: 1.0 * 0.15, progress, range: 'cosy' },
       },
     ])
     .with('work', () => [
       {
-        white: [1.0, 0.5, 'work'], // noon
+        white: { brightness: 1.0, progress: 0.5, range: 'work' }, // noon
       },
       {
-        white: [1.0, 0.5, 'work'],
+        white: { brightness: 1.0, progress: 0.5, range: 'work' },
       },
     ])
-    .otherwise(() => [undefined, undefined])
+    .exhaustive()
 
   return Room(
     'backroom',
-    payload && ZLight.make('light1', 'ikea', 'backroom/lamp', payload),
-    payload && ZLight.make('spot1', 'ikea-spot', 'backroom/spot-1', payload),
-    payload && ZLight.make('spot2', 'ikea-spot', 'backroom/spot-2', payload),
-    payload2 && ZLight.make('spot3', 'ikea-spot', 'backroom/spot-3', payload2),
-    payload2 && ZLight.make('spot4', 'ikea-spot', 'backroom/spot-4', payload2),
+    ZLight.make('light1', 'ikea', 'backroom/lamp', payload),
+    ZLight.make('spot1', 'ikea-spot', 'backroom/spot-1', payload),
+    ZLight.make('spot2', 'ikea-spot', 'backroom/spot-2', payload),
+    ZLight.make('spot3', 'ikea-spot', 'backroom/spot-3', payload2),
+    ZLight.make('spot4', 'ikea-spot', 'backroom/spot-4', payload2),
     ZButton.make(
       'button1',
       'backroom/buttonsx3-1',
@@ -248,11 +308,12 @@ const backroom = (room: RoomModel, model: Model): Container<Msg> => {
   )
 }
 
-const office = (room: RoomModel, model: Model): Container<Msg> => {
+type BedroomScenes = 'dim' | 'morning2' | 'bright' | 'work' | 'purple' | 'blue'
+const bedroom = (room: RoomModel, model: Model): Container<Msg> => {
   const [prog, dayNight] = model.sunProgress
   let temp = dayNight === 'day' ? prog : 1.0
 
-  const scene = doorbellBlinking(model) ? 'doorbell' : room.scene
+  const scene = resolveSceneCommonArea<OfficeScenes>(model, room)
 
   const buttons = hashMap({
     '1_single': 'off',
@@ -267,74 +328,143 @@ const office = (room: RoomModel, model: Model): Container<Msg> => {
     '2_single': 'dim',
     '3_single': 'bright',
   })
-  const scenes = hashMapT<ZLightPayload>({
-    off: { state: 'OFF' },
-    dim: {
-      white: [0.15, temp, 'cosy'],
-    },
-    morning2: {
-      white: [0.3, temp, 'cosy'],
-    },
-    bright: {
-      white: [1.0, temp, 'cosy'],
-    },
-    work: {
-      white: [1.0, 0.5, 'work'],
-    },
-    purple: { state: 'ON', brightness: 100, color: { r: 204, g: 24, b: 195 } },
-    blue: { state: 'ON', brightness: 100, color: { r: 2, g: 109, b: 163 } },
-    doorbell: {
+  const payload = match<CommonArea<OfficeScenes>, Partial<ZLightPayload>>(scene)
+    .with('off', 'none', () => ({ state: 'OFF' }))
+    .with('dim', () => ({
+      white: { brightness: 0.15, progress: temp, range: 'cosy' },
+    }))
+    .with('morning2', () => ({
+      white: { brightness: 0.3, progress: temp, range: 'cosy' },
+    }))
+    .with('bright', 'bedtime', () => ({
+      white: { brightness: 1.0, progress: temp, range: 'cosy' },
+    }))
+    .with('work', () => ({
+      white: { brightness: 1.0, progress: 0.5, range: 'work' },
+    }))
+    .with('purple', () => ({
+      state: 'ON',
+      brightness: 100,
+      color: { r: 204, g: 24, b: 195 },
+    }))
+    .with('blue', () => ({
+      state: 'ON',
+      brightness: 100,
+      color: { r: 2, g: 109, b: 163 },
+    }))
+    .with('doorbell', () => ({
       state: 'ON',
       color: { r: 255, g: 0, b: 0 },
       brightness: 255,
-    },
+    }))
+    .exhaustive()
+
+  return Room(
+    'bedroom',
+    ZLight.make('light1', 'ikea', 'bedroom/lamp', payload),
+    // ZLight.make('light2', 'ikea', 'office/lamp-small', payload),
+    // ZButton.make('button1', 'switch-x4', SetScene('office', buttons)),
+    // ZButton.make('button2', 'office/buttonsx3', SetScene('office', buttons_x3)),
+    // ZTemp.make('office', 'office/temp', SetSensorRaw('office')),
+  )
+}
+
+type OfficeScenes = 'dim' | 'morning2' | 'bright' | 'work' | 'purple' | 'blue'
+const office = (room: RoomModel, model: Model): Container<Msg> => {
+  const [prog, dayNight] = model.sunProgress
+  let temp = dayNight === 'day' ? prog : 1.0
+
+  const scene = resolveSceneCommonArea<OfficeScenes>(model, room)
+
+  const buttons = hashMap({
+    '1_single': 'off',
+    '2_single': 'dim',
+    '2_double': 'morning2',
+    '3_single': 'bright',
+    '4_single': 'purple',
+    '4_double': 'blue',
   })
-  const payload = scenes(scene)
+  const buttons_x3 = hashMap({
+    '1_single': 'off',
+    '2_single': 'dim',
+    '3_single': 'bright',
+  })
+  const payload = match<CommonArea<OfficeScenes>, Partial<ZLightPayload>>(scene)
+    .with('off', 'none', () => ({ state: 'OFF' }))
+    .with('dim', () => ({
+      white: { brightness: 0.15, progress: temp, range: 'cosy' },
+    }))
+    .with('morning2', () => ({
+      white: { brightness: 0.3, progress: temp, range: 'cosy' },
+    }))
+    .with('bright', 'bedtime', () => ({
+      white: { brightness: 1.0, progress: temp, range: 'cosy' },
+    }))
+    .with('work', () => ({
+      white: { brightness: 1.0, progress: 0.5, range: 'work' },
+    }))
+    .with('purple', () => ({
+      state: 'ON',
+      brightness: 100,
+      color: { r: 204, g: 24, b: 195 },
+    }))
+    .with('blue', () => ({
+      state: 'ON',
+      brightness: 100,
+      color: { r: 2, g: 109, b: 163 },
+    }))
+    .with('doorbell', () => ({
+      state: 'ON',
+      color: { r: 255, g: 0, b: 0 },
+      brightness: 255,
+    }))
+    .exhaustive()
 
   return Room(
     'office',
-    payload && ZLight.make('light1', 'ikea', 'office/lamp', payload),
-    payload && ZLight.make('light2', 'ikea', 'office/lamp-small', payload),
+    ZLight.make('light1', 'ikea', 'office/lamp', payload),
+    ZLight.make('light2', 'ikea', 'office/lamp-small', payload),
     ZButton.make('button1', 'switch-x4', SetScene('office', buttons)),
     ZButton.make('button2', 'office/buttonsx3', SetScene('office', buttons_x3)),
     ZTemp.make('office', 'office/temp', SetSensorRaw('office')),
   )
 }
 
+type PlayroomScenes = 'dim' | 'bright' | 'work'
 const playroom = (room: RoomModel, model: Model): Container<Msg> => {
   const [prog, dayNight] = model.sunProgress
-  let temp = dayNight === 'day' ? prog : 1.0
+  let progress = dayNight === 'day' ? prog : 1.0
 
   const buttons = hashMap({
     '1_single': 'off',
     '2_single': 'dim',
     '3_single': 'bright',
   })
-  const scene = doorbellBlinking(model) ? 'doorbell' : room.scene
-  const scenes = hashMapT<ZLightPayload>({
-    off: { state: 'OFF' },
-    doorbell: {
+  const scene = resolveSceneCommonArea<PlayroomScenes>(model, room)
+  const payload = match<CommonArea<PlayroomScenes>, Partial<ZLightPayload>>(
+    scene,
+  )
+    .with('off', 'none', 'bedtime', () => ({ state: 'OFF' }))
+    .with('doorbell', () => ({
       state: 'ON',
       color: { r: 255, g: 0, b: 0 },
       brightness: 255,
-    },
-    dim: {
-      white: [0.3, temp, 'cosy'],
-    },
-    bright: {
-      white: [1.0, temp, 'cosy'],
-    },
-    work: {
-      white: [1.0, 0.5, 'work'],
-    },
-  })
-
-  const payload = scenes(scene)
+    }))
+    .with('dim', () => ({
+      white: { brightness: 0.3, progress, range: 'cosy' },
+    }))
+    .with('bright', () => ({
+      white: { brightness: 1.0, progress, range: 'cosy' },
+    }))
+    .with('work', () => ({
+      white: { brightness: 1.0, progress: 0.5, range: 'work' },
+    }))
+    .exhaustive()
 
   return Room(
     'playroom',
-    payload && ZLight.make('light1', 'ikea', 'playroom/lamp-desk', payload),
-    payload && ZLight.make('light2', 'ikea', 'playroom/lamp-tall', payload),
+    ZLight.make('light1', 'ikea', 'playroom/lamp-desk', payload),
+    ZLight.make('light2', 'ikea', 'playroom/lamp-tall', payload),
     ZButton.make(
       'button1',
       'playroom/buttonsx3-1',
@@ -349,36 +479,38 @@ const playroom = (room: RoomModel, model: Model): Container<Msg> => {
   )
 }
 
-
+type KidRoomScenes = 'dim' | 'bright' | 'work'
 const kidRoom =
   (kid: string) =>
   (room: RoomModel, model: Model): Container<Msg> => {
     const [prog, dayNight] = model.sunProgress
     let temp = dayNight === 'day' ? prog : 1.0
 
-    const scene = doorbellBlinking(model) ? 'doorbell' : room.scene
+    const scene = resolveScenePrivateArea<KidRoomScenes>(model, room)
 
     const buttons_x3 = hashMap({
       '1_single': 'off',
       '2_single': 'dim',
       '3_single': 'bright',
     })
-    const payload = match<string | undefined, NullPartial<ZLightPayload>>(scene)
-      .with('off', () => ({ state: 'OFF' }))
+    const payload = match<PrivateArea<KidRoomScenes>, Partial<ZLightPayload>>(
+      scene,
+    )
+      .with('off', 'none', () => ({ state: 'OFF' }))
       .with('dim', () => ({
-        white: [0.15, temp, 'cosy'],
+        white: { brightness: 0.15, progress: temp, range: 'cosy' },
       }))
       .with('bright', () => ({
-        white: [1.0, temp, 'cosy'],
+        white: { brightness: 1.0, progress: temp, range: 'cosy' },
       }))
       .with('work', () => ({
-        white: [1.0, 0.5, 'work'],
+        white: { brightness: 1.0, progress: 0.5, range: 'work' },
       }))
-      .otherwise(() => undefined)
+      .exhaustive()
 
     return Room(
       kid,
-      payload && ZLight.make('light1', 'ikea', `${kid}/lamp`, payload),
+      ZLight.make('light1', 'ikea', `${kid}/lamp`, payload),
       ZButton.make('button2', `${kid}/buttonsx3`, SetScene(kid, buttons_x3)),
     )
   }
@@ -400,17 +532,19 @@ const influxClient = new InfluxDB({
 }).getWriteApi(secrets.influx.org, secrets.influx.bucket)
 
 const interfaces: InterfaceFactory<Msg, Model>[] = [
-  new HttpInterfaceFactory(MsgT, 3030),
+  new HttpInterfaceFactory(MsgT, oauthDBPath, 3030),
   modelCacheFactory,
 ]
 
-runtime(
-  {
-    update,
-    house,
-    subscriptions,
-    initialModel,
-  },
-  { mqttClient, influxClient, interfaces, logPath, secrets },
-  SetHour(new Date()),
-)
+;(async () => {
+  await runtime(
+    {
+      update,
+      house,
+      subscriptions,
+      initialModel,
+    },
+    { mqttClient, influxClient, interfaces, logPath, secrets },
+    SetHour(new Date()),
+  )
+})()
