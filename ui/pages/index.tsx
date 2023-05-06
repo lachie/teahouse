@@ -1,12 +1,12 @@
 import type { NextPage } from 'next'
-import { Model, RoomModel, doorbellRinging } from '../lib/Model'
+import { Model, RoomModel, doorbellRinging } from '../lachies-house/Model'
 import {
   SensorReading,
   SetScene,
   PushEvent,
   LeaveHouse,
   Bedtime,
-} from '../lib/Msg'
+} from '../lachies-house/Msg'
 import { useDispatchMsgTagger } from '../lib/useDispatchMsg'
 import classNames from 'classnames'
 import {

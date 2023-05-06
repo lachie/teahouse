@@ -20,7 +20,7 @@ const bomPath = ({ location, kind }: BomForecast): string => `https://api.weathe
 const grab = async (spec: BomForecast): Promise<Json> => {
     try {
         const rsp = await axios(bomPath(spec), {headers: {accept: 'application/json'}, responseType: 'json'})
-        console.log("data", rsp.data)
+        // console.log("data", rsp.data)
         return rsp.data.data as Json
     } catch(e) {
         console.log("error", e.toJSON())
@@ -36,7 +36,7 @@ const grab = async (spec: BomForecast): Promise<Json> => {
 const location = 'r3gxbv'
 
 export default async function handler(req, res) {
-    console.log("fetching bom")
+    // console.log("fetching bom")
     const bom = {
         daily: await grab({location, kind: 'forecasts/daily'}),
         // hourly: await grab({location, kind: 'forecasts/3-hourly'}),

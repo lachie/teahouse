@@ -1,5 +1,5 @@
 import { MoonIcon, SunIcon } from "@heroicons/react/outline"
-import { Model } from "../lib/Model"
+import { Model } from "../lachies-house/Model"
 import format from 'date-fns/format'
 
 export const DayProgress = ({ model }: {model: Model}) => {

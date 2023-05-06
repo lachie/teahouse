@@ -1,6 +1,6 @@
 import { useRouter } from 'next/router'
 import { useCallback } from 'react'
-import { ModelT, Model, PlayroomModel, PlayroomModelT } from '../../lib/Model'
+import { ModelT, Model  } from '../../lachies-house/Model'
 import { useFetchModel } from '../../lib/useFetchModel'
 
 function flattenKey(

@@ -3,12 +3,12 @@ import { Node } from '../house'
 import { RuntimeContext } from '../runtime'
 import { isDeepStrictEqual } from 'node:util'
 
-type ZNode<P>  = Node & {
+type MqttNode<P>  = Node & {
     topic: string
     payload: P
 }
 
-export abstract class ZDevice<Msg, P, D extends ZNode<P>> extends Device<D, Msg> {
+export abstract class PublishingDevice<Msg, P, D extends MqttNode<P>> extends Device<D, Msg> {
   abstract publish(
     ctx: RuntimeContext<Msg>,
     device: D

@@ -2,7 +2,7 @@ import { AsyncClient } from 'async-mqtt'
 import { Device } from './device'
 import { Node } from '../house'
 import { RuntimeContext } from '../runtime'
-import { ZDevice } from './zDevice'
+import { PublishingDevice } from './pubDevice'
 import { normalise, sawNorm, sineNorm } from '../util/scale'
 
 const warmTemp = 454
@@ -68,7 +68,7 @@ export type ZLightNode = Node & {
   payload: PartialPayload
 }
 
-export class ZLight<Msg> extends ZDevice<Msg, PartialPayload, ZLightNode> {
+export class ZLight<Msg> extends PublishingDevice<Msg, PartialPayload, ZLightNode> {
   static make(
     key: string,
     kind: LightKind,

@@ -5,3 +5,4 @@ yarn-error.log
 !ui/lib
 model.json
 log.json
+zigbee2mqtt2influx/

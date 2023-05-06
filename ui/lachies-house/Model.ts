@@ -1,8 +1,60 @@
 import * as t from 'io-ts'
 import * as tt from 'io-ts-types'
 import { SensorReadingT } from './Msg'
-import { addDays, differenceInCalendarDays } from 'date-fns'
+import { addDays, differenceInCalendarDays, addWeeks } from 'date-fns'
 import * as SunCalc from 'suncalc'
+
+export function initialModel(initialDate: Date): Model {
+  return {
+    doorbell: false,
+    doorbellBlink: false,
+    doorbellEvents: [],
+    userPresenceEvents: [],
+    date: initialDate,
+    hour: initialDate.getHours(),
+    hourLate: isHourLate(initialDate),
+    kidweek: isKidWeek(initialDate),
+    sunProgress: [0, 'day'],
+    daylightProgress: 0,
+    houseScene: 'none',
+    people: [],
+    rooms: {
+      playroom: {
+        occupied: false,
+        sensors: {},
+        scene: undefined,
+      },
+      backroom: {
+        occupied: false,
+        sensors: {},
+        scene: undefined,
+      },
+      office: {
+        occupied: false,
+        sensors: {},
+        scene: undefined,
+      desk: {
+        command: 'idle',
+      }
+      },
+      bedroom: {
+        occupied: false,
+        sensors: {},
+        scene: undefined,
+      },
+      'sams-room': {
+        occupied: false,
+        sensors: {},
+        scene: undefined,
+      },
+      'pipers-room': {
+        occupied: false,
+        sensors: {},
+        scene: undefined,
+      },
+    },
+  }
+}
 
 export type Person = {
   name: string
@@ -48,6 +100,11 @@ export type RoomModel = t.TypeOf<typeof RoomModelT>
 export const BackroomModelT = RoomModelT
 export type BackroomModel = RoomModel
 
+export const OfficeRoomModelT = t.intersection([RoomModelT, t.type({
+  desk: t.type({command: t.string})
+})])
+export type OfficeRoomModel = t.TypeOf<typeof OfficeRoomModelT>
+
 export const SunProgress = t.tuple([
   t.number,
   t.keyof({ day: null, night: null }),
@@ -63,7 +120,7 @@ export const ModelT = t.type({
   rooms: t.type({
     playroom: RoomModelT,
     backroom: RoomModelT,
-    office: RoomModelT,
+    office: OfficeRoomModelT,
     'sams-room': RoomModelT,
     'pipers-room': RoomModelT,
     bedroom: RoomModelT,
@@ -115,6 +172,9 @@ export const modelZero: Model = {
       occupied: false,
       sensors: {},
       scene: undefined,
+      desk: {
+        command: 'idle',
+      }
     },
     bedroom: {
       occupied: false,
@@ -166,10 +226,22 @@ export const ModelCacheT = t.type({
 })
 export type ModelCache = t.TypeOf<typeof ModelCacheT>
 
+const kidWeekReference = new Date('2021-08-21')
+
+export function adjustKidweek(from: Date, to: 'kid'|'non'): Date {
+  const kidWeek = isKidWeek(from) 
+
+  switch(to) {
+    case 'kid':
+      return kidWeek ? from : addDays(from, 14)
+    case 'non':
+      return kidWeek ? addDays(from, 14) : from
+  }
+}
+
 // I've got my kids every other fortnight, for a fortnight
 export function isKidWeek(date: Date): boolean {
-  const kidWeekRef = new Date('2021-08-21')
-  const delta = differenceInCalendarDays(date, kidWeekRef)
+  const delta = differenceInCalendarDays(date, kidWeekReference)
   const fortnight = Math.floor(delta / 14)
 
   return fortnight % 2 == 0

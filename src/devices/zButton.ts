@@ -26,12 +26,12 @@ export class ZButton<Msg> extends Device<ZButtonNode<Msg>, Msg> {
   }
 
   async add({ subMgr, schedMgr }: RuntimeContext<Msg>, p: ZButtonNode<Msg>) {
-    console.log('add', p.key, p.topic)
+    // console.log('add', p.key, p.topic)
     subMgr.subscribe(
       p.key,
       `zigbee2mqtt/${p.topic}`,
       ({ message }: { message: string }) => {
-        console.log("zButton", p.topic, message)
+        // console.log("zButton", p.topic, message)
         const { action } = JSON.parse(message)
 
         if (action !== undefined) {

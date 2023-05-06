@@ -97,5 +97,5 @@
     // "skipDefaultLibCheck": true,                      /* Skip type checking .d.ts files that are included with TypeScript. */
     "skipLibCheck": true /* Skip type checking all .d.ts files. */
   },
-  "include": ["lachies-house.ts", "src/**/*", "typings/dhcp.d.ts", "../src/**/*"],
+  "include": ["lachies-house.ts", "lachies-house", "src/**/*", "typings/dhcp.d.ts", "../src/**/*"],
 }

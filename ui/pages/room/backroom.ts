@@ -1,6 +1,6 @@
 import type { NextPage } from 'next'
-import { ModelT, PlayroomModel } from '../../lib/Model'
-import { LightState, SetLightOn, ToggleLight } from '../../lib/Msg'
+import { ModelT, RoomModel } from '../../lachies-house/Model'
+import { LightState, SetLightOn, ToggleLight } from '../../lachies-house/Msg'
 import { useDispatchMsg, useDispatchMsgTagger } from '../../lib/useDispatchMsg'
 import classNames from 'classnames'
 import {
@@ -11,7 +11,7 @@ import {
 import { LightBulbOffIcon } from '../../lib/LightBulbOffIcon'
 import { useModelUpdates } from '../../lib/useModelUpdates'
 
-type PlayroomProps = { model: PlayroomModel }
+type PlayroomProps = { model: RoomModel }
 const Playroom = ({ model }: PlayroomProps) => {
   const setLightMode = useDispatchMsgTagger(SetLightOn('playroom'))
 

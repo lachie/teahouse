@@ -1,7 +1,7 @@
 import { useDispatchMsgTagger } from '../lib/useDispatchMsg'
 import { NextPage } from "next"
 import StdLayout from "../components/StdLayout"
-import { ClearRoomScenes, PushEvent } from '../lib/Msg'
+import { ClearRoomScenes, PushEvent } from '../lachies-house/Msg'
 import { getHostFromReq, HostContext, HostSpecProps } from "../lib/getHostFromReq"
 
 const FrontdoorC = ({host}: HostSpecProps) => {

@@ -8,4 +8,4 @@ WORKDIR /app
 
 # COPY . .
 
-CMD ["yarn", "ts-node", "--files", "lachies-house.ts"]
+CMD ["yarn", "ts-node", "--files", "run-house.ts"]

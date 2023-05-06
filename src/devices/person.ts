@@ -63,8 +63,8 @@ export class Person<Msg> extends Device<PersonNode<Msg>, Msg> {
       .filter(x => x)
       .filter((c) => c.online)
       .reduce((cs, c) => cs.add(c.client_mac), new Set<string>())
-    console.log("macs", macs)
-    console.log("mac index", this.#macIndex)
+    // console.log("macs", macs)
+    // console.log("mac index", this.#macIndex)
     const people = [...macs].reduce<Set<string>>((pp, mac) => {
         const person = this.#macIndex[mac]
         if(person) { pp.add(person) }
@@ -72,8 +72,8 @@ export class Person<Msg> extends Device<PersonNode<Msg>, Msg> {
       },
       new Set<string>(),
     )
-    console.log("presentPeople", this.presentPeople)
-    console.log("matched people", people)
+    // console.log("presentPeople", this.presentPeople)
+    // console.log("matched people", people)
 
     let newPeople = new Set(
       [...people].filter((i) => !this.presentPeople.has(i)),
@@ -83,15 +83,15 @@ export class Person<Msg> extends Device<PersonNode<Msg>, Msg> {
     )
     this.presentPeople = people
 
-    console.log("newPeople", newPeople)
-    console.log("leftPeople", leftPeople)
+    // console.log("newPeople", newPeople)
+    // console.log("leftPeople", leftPeople)
 
     for(const p of newPeople) {
-      console.log("arrive", p)
+      // console.log("arrive", p)
       this.dispatchMessage(this.people[p]?.arriveTagger())
     }
     for(const p of leftPeople) {
-      console.log("leave", p)
+      // console.log("leave", p)
       this.dispatchMessage(this.people[p]?.leaveTagger())
     }
   }
@@ -121,14 +121,14 @@ export class Person<Msg> extends Device<PersonNode<Msg>, Msg> {
   #reindex() {
     this.#macIndex = {}
     for (const p of Object.values(this.people)) {
-      console.log("index", p)
+      // console.log("index", p)
       for (const m of p.macs) {
         const mm = m.replaceAll(/[^A-Za-z0-9]/g, '').toLowerCase()
         this.#macIndex[mm] = p.key
       }
     }
-    console.log("people", this.people)
-    console.log("macIndex", this.#macIndex)
+    // console.log("people", this.people)
+    // console.log("macIndex", this.#macIndex)
   }
 
   async remove(_: RuntimeContext<Msg>, p: PersonNode<Msg>) {

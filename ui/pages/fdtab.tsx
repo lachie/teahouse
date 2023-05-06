@@ -8,15 +8,16 @@ import {
   HomeIcon,
   MoonIcon,
 } from '@heroicons/react/outline'
-import { Model, present, doorbellRinging, RoomModel } from '../lib/Model'
+import { Model, present, doorbellRinging, RoomModel } from '../lachies-house/Model'
 import { Weather } from '../components/Weather'
 import { DayProgress } from '../components/DayProgress'
 import { ReactElement, ReactNode } from 'react'
 import { useDispatchMsgTagger } from '../lib/useDispatchMsg'
-import { LeaveHouse, Bedtime, PushEvent, SetScene } from '../lib/Msg'
-import { playroomScenes, SceneButton } from '../components/SceneButton'
+import { LeaveHouse, Bedtime, SetScene, DoorbellCancel } from '../lachies-house/Msg'
+import { SceneButton } from '../components/SceneButton'
 import { Sound } from '../components/Sound'
 import { FullyKiosk, useFullyKiosk } from '../lib/useFullyKiosk'
+import { playroomScenes } from 'components/RoomScenes'
 
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement>
 const Button = (props: ButtonProps): ReactElement => (
@@ -60,9 +61,7 @@ const Globals = ({
   )
   const leaveHouse = useDispatchMsgTagger(LeaveHouse)
   const bedtime = useDispatchMsgTagger(Bedtime)
-  const clearDoorbell = useDispatchMsgTagger(
-    PushEvent('doorbellEvents', 'cancelled'),
-  )
+  const clearDoorbell = useDispatchMsgTagger(DoorbellCancel)
   const DoorbellIcon = doorbell ? (
     <BellIcon className="h-8 w-8 text-red-500" />
   ) : (

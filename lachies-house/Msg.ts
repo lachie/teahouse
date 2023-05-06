@@ -17,6 +17,26 @@ export const BedtimeT = t.type({
 export type Bedtime = t.TypeOf<typeof BedtimeT>
 export const Bedtime = (): Bedtime => ({ type: 'house-bedtime' })
 
+export const DoorbellTriggerT = t.type({
+  type: t.literal('doorbell-trigger'),
+})
+export type DoorbellTrigger = t.TypeOf<typeof DoorbellTriggerT>
+export const DoorbellTrigger = (): DoorbellTrigger => ({ type: 'doorbell-trigger' })
+
+export const DoorbellCancelT = t.type({
+  type: t.literal('doorbell-cancel'),
+})
+export type DoorbellCancel = t.TypeOf<typeof DoorbellCancelT>
+export const DoorbellCancel = (): DoorbellCancel => ({ type: 'doorbell-cancel' })
+
+export const ToggleRoomSceneT = t.type({
+  type: t.literal('toggle-room-scene'),
+  room: t.string,
+})
+export type ToggleRoomScene = t.TypeOf<typeof ToggleRoomSceneT>
+export const ToggleRoomScene = (room: string) => (): ToggleRoomScene => ({ type: 'toggle-room-scene', room })
+
+
 export const SetOccupancyT = t.type({
   type: t.literal('set-occupancy'),
   room: t.string,
@@ -34,16 +54,22 @@ export const SetOccupancy =
   })
 
 // SetScene
-export const SetSceneT = t.type({
+export const SetRoomSceneT = t.type({
   type: t.literal('set-scene'),
   room: t.string,
   scene: t.union([t.string, t.undefined]),
 })
 
-export type SetScene = t.TypeOf<typeof SetSceneT>
-export const SetScene =
+export type SetRoomScene = t.TypeOf<typeof SetRoomSceneT>
+export const SetRoomScene = (room: string, scene: string | undefined) => (): SetRoomScene => ({
+  type: 'set-scene',
+  room,
+  scene,
+})
+
+export const SetRoomSceneMap =
   (room: string, tagScene: (action: string) => string | undefined = (x) => x) =>
-  (action: string): SetScene => ({
+  (action: string): SetRoomScene => ({
     type: 'set-scene',
     room,
     scene: tagScene(action),
@@ -228,11 +254,30 @@ export const ClearRoomScenes = (): ClearRoomScenes => ({
   type: 'clear-room-scenes',
 })
 
+// DeskCommand
+export const DeskCommandT = t.type({
+  type: t.literal('desk-cmd'),
+  room: t.string,
+  command: t.union([t.keyof({up: null, down: null, idle: null}), t.undefined]),
+})
+
+export type DeskCommand = t.TypeOf<typeof DeskCommandT>
+export const DeskCommand =
+  (room: string, command: DeskCommand['command']): DeskCommand =>
+    ({type: 'desk-cmd',
+    room,
+    command,
+  })
+
 export const SetHouseScene = SetValue('houseScene')
 
 const MsgRawT = t.union([
   LeaveHouseT,
   BedtimeT,
+  DoorbellTriggerT,
+  DoorbellCancelT,
+  ToggleRoomSceneT,
+  SetRoomSceneT,
   SetValueT,
   SetValuesT,
   SetSetT,
@@ -240,7 +285,6 @@ const MsgRawT = t.union([
   PushEventT,
   ToggleBoolT,
   SetOccupancyT,
-  SetSceneT,
   SetSensorRawT,
   SetHourT,
   // SetDataT,
@@ -248,6 +292,7 @@ const MsgRawT = t.union([
   SetZigbeeEventT,
   ToggleLightT,
   ClearRoomScenesT,
+  DeskCommandT,
 ])
 type MsgRaw = t.TypeOf<typeof MsgRawT>
 

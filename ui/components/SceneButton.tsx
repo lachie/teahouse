@@ -21,12 +21,6 @@ export type SceneSpec = {
   Icon?: IconComp
 }
 
-export const playroomScenes: SceneSpec[] = [
-  { scene: 'off', Icon: XCircleIcon },
-  { scene: 'dim', colour: 'amber' },
-  { scene: 'bright', colour: 'amberbright' },
-  { scene: 'work', colour: 'sky' },
-]
 
 export type SetSceneFn = (scene?: string) => Promise<void>
 type SceneButtonProps = {

@@ -1,4 +1,4 @@
-import { Command, CmdNone } from '../commands'
+import { Command, CmdNone } from '../src/commands'
 import { match } from 'ts-pattern'
 import * as immutable from 'object-path-immutable'
 
@@ -20,10 +20,13 @@ import {
   LightStates,
   SetSensorRaw,
   SetZigbeeEvent,
-  SetScene,
-  PushEvent,
+  SetRoomScene,
+  PushEvent as PushEventMake,
   Compose,
+  DeskCommand,
+  ToggleRoomScene,
 } from './Msg'
+import type {PushEvent} from './Msg'
 
 /*
  * update
@@ -32,6 +35,10 @@ export const update = (model: Model, msg: Msg): [Model, Command<Msg>] =>
   match<Msg, [Model, Command<Msg>]>(msg)
     .with({ type: 'leave-house' }, () => [leaveHouse(model), CmdNone])
     .with({ type: 'house-bedtime' }, () => [bedtime(model), CmdNone])
+    .with({ type: 'doorbell-trigger' }, () => [doorbellTrigger(model), CmdNone])
+    .with({ type: 'doorbell-cancel' }, () => [doorbellCancel(model), CmdNone])
+    .with({ type: 'toggle-room-scene' }, (msg) => [toggleRoomScene(model, msg), CmdNone])
+    .with({ type: 'set-scene' }, (msg) => [updateScene(model, msg), CmdNone])
     .with({ type: 'set-value' }, ({ key, value }) => [
       setValue(model, key, value),
       CmdNone,
@@ -56,7 +63,6 @@ export const update = (model: Model, msg: Msg): [Model, Command<Msg>] =>
       updateOccupancy(model, msg),
       CmdNone,
     ])
-    .with({ type: 'set-scene' }, (msg) => [updateScene(model, msg), CmdNone])
     .with({ type: 'set-sensor-raw' }, (msg) => [
       updateSensorRaw(model, msg),
       CmdNone,
@@ -77,7 +83,16 @@ export const update = (model: Model, msg: Msg): [Model, Command<Msg>] =>
       CmdNone,
     ])
     .with({ type: 'compose' }, (msg) => composeUpdate(model, msg))
+    .with({ type: 'desk-cmd' }, (msg) => [deskCommand(model, msg), CmdNone])
     .exhaustive()
+
+
+const deskCommand = (
+  model: Model,
+  {room, command}: DeskCommand,
+): Model =>
+    immutable.set(model, ['rooms', room, 'desk', 'command'], command)
+
 
 const composeUpdate = (
   model: Model,
@@ -91,12 +106,22 @@ const composeUpdate = (
     [model, CmdNone],
   )
 
+/*
+ * leaving the house - turn all the lights off
+ */
 const leaveHouse = (model: Model): Model => {
   return roomKeys.reduce((model: Model, roomKey: RoomKey) => {
     return immutable.set(model, ['rooms', roomKey, 'scene'], 'off')
   }, model)
 }
 
+/*
+ * it's bedtime!
+ * Let's light up the house to assist me getting ready for beddie byes!
+ * - turn on the bedroom lights
+ * - dim the backroom lights
+ * - if it's a non-kid week, dim the playroom lights
+ */
 const bedtime = (model: Model): Model => {
   // switch all rooms off
   let newModel = roomKeys.reduce((model: Model, roomKey: RoomKey) => {
@@ -136,9 +161,7 @@ const immutableSetSet = <T extends Record<string, unknown>>(
   value: string,
   clear = false,
 ): T => {
-  console.log('immutableSetSet', key, value, clear)
   const valSet = new Set(immutable.get(model, key))
-  console.log('valSet', valSet)
   if (clear) {
     valSet.delete(value)
   } else {
@@ -159,6 +182,9 @@ const toggleBool = (model: Model, key: Path): Model => {
   return immutable.set(model, key, !value)
 }
 
+const doorbellTrigger = (model: Model): Model => pushEvent(model, PushEventMake('doorbellEvents', 'triggered')())
+const doorbellCancel = (model: Model): Model => pushEvent(model, PushEventMake('doorbellEvents', 'cancelled')())
+
 const pushEvent = (model: Model, { event, at, path }: PushEvent): Model =>
   immutable.push(model, path, [at, event])
 
@@ -167,7 +193,20 @@ const updateOccupancy = (
   { room, occupied }: SetOccupancy,
 ): Model => immutable.set(model, ['rooms', room, 'occupied'], occupied)
 
-const updateScene = (model: Model, { room, scene }: SetScene): Model =>
+const toggleRoomScene = (model: Model, { room }: ToggleRoomScene): Model => {
+  const scene = immutable.get(model, ['rooms', room, 'scene'])
+
+  let nextScene
+  if(scene === 'off') {
+    nextScene = 'on'
+  } else {
+    nextScene = 'off'
+  }
+
+  return immutable.set(model, ['rooms', room, 'scene'], nextScene)
+}
+
+const updateScene = (model: Model, { room, scene }: SetRoomScene): Model =>
   immutable.set(model, ['rooms', room, 'scene'], scene)
 
 const updateSensorRaw = (

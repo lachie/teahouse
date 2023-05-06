@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "srv": "NODE_OPTIONS='--openssl-legacy-provider' next dev -p 3003",
-    "synclib": "cp ../src/lachies-house/Model.ts ./lib ; cp ../src/lachies-house/Msg.ts ./lib"
+    "synclib": "cp -a ../lachies-house/* ./lachies-house/"
   },
   "dependencies": {
     "@headlessui/react": "^1.6.6",

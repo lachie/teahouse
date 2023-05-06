@@ -1,6 +1,6 @@
 import ky from 'ky'
 import { HostSpec } from './getHostFromReq'
-import { Msg } from './Msg'
+import { Msg } from '../lachies-house/Msg'
 
 export default async function dispatchMsg(
   host: HostSpec,

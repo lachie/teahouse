@@ -1,6 +1,6 @@
 import { ReactNode, ReactElement, useEffect } from 'react'
 import { HostContext, HostSpec } from '../lib/getHostFromReq'
-import { Model, ModelT } from '../lib/Model'
+import { Model, ModelT } from '../lachies-house/Model'
 import { useModelUpdates } from '../lib/useModelUpdates'
 
 type ModelUpdaterProps = {

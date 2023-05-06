@@ -1,7 +1,7 @@
 import ky from 'ky'
 import { useContext, useEffect, useState } from 'react'
 import { useSWRConfig } from 'swr'
-import { Msg } from './Msg'
+import { Msg } from '../lachies-house/Msg'
 import dispatchMsg from './dispatchMsg'
 import { HostContext } from './getHostFromReq'
 
