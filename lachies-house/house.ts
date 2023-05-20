@@ -323,7 +323,7 @@ const office = (room: OfficeRoomModel, model: Model): Container<Msg> => {
     }))
     .exhaustive()
 
-    
+
 
   return Room(
     'office',
@@ -334,6 +334,15 @@ const office = (room: OfficeRoomModel, model: Model): Container<Msg> => {
     ZTemp.make('office', 'office/temp', SetSensorRaw('office')),
     DeskCtl.make('office', 'office/desk', room.desk.command as DeskCommand),
   )
+}
+
+type MultiPayload = Partial<ZLightPayload>[] | Partial<ZLightPayload>
+function unroll(n: number, p: MultiPayload): Partial<ZLightPayload>[] {
+  if ("length" in p) {
+    return p
+  } else {
+    return Array(n).fill(p)
+  }
 }
 
 /*
@@ -350,7 +359,7 @@ const playroom = (room: RoomModel, model: Model): Container<Msg> => {
     '3_single': 'bright',
   })
   const scene = resolveSceneCommonArea<PlayroomScenes>(model, room)
-  const payload = match<CommonArea<PlayroomScenes>, Partial<ZLightPayload>>(
+  const payload = match<CommonArea<PlayroomScenes>, MultiPayload>(
     scene,
   )
     .with('off', 'none', 'bedtime', () => ({ state: 'OFF' }))
@@ -362,18 +371,28 @@ const playroom = (room: RoomModel, model: Model): Container<Msg> => {
     .with('dim', () => ({
       white: { brightness: 0.3, progress, range: 'cosy' },
     }))
-    .with('bright', 'on', () => ({
-      white: { brightness: 1.0, progress, range: 'cosy' },
-    }))
+    .with('bright', 'on', () => ([
+      {
+        white: { brightness: 1.0, progress, range: 'cosy' },
+      },
+      {
+        white: { brightness: 1.0 * 0.15, progress, range: 'cosy' },
+      }
+    ]))
     .with('work', () => ({
       white: { brightness: 1.0, progress: 0.5, range: 'work' },
     }))
     .exhaustive()
 
+  const [payload1, payload2] = unroll(2, payload)
+
   return Room(
     'playroom',
-    ZLight.make('light1', 'ikea', 'playroom/lamp-desk', payload),
-    ZLight.make('light2', 'ikea', 'playroom/lamp-tall', payload),
+    ZLight.make('light1', 'ikea', 'playroom/lamp-desk', payload1),
+    ZLight.make('light2', 'ikea', 'playroom/lamp-tall', payload1),
+    ZLight.make('light3a', 'ikea', 'playroom/spot-1', payload1),
+    ZLight.make('light3b', 'ikea', 'playroom/spot-2', payload2),
+    ZLight.make('light3c', 'ikea', 'playroom/spot-3', payload1),
     ZButton.make(
       'button1',
       'playroom/buttonsx3-1',
@@ -394,38 +413,38 @@ const playroom = (room: RoomModel, model: Model): Container<Msg> => {
 type KidRoomScenes = 'dim' | 'bright' | 'work'
 const kidRoom =
   (kid: string) =>
-  (room: RoomModel, model: Model): Container<Msg> => {
-    const [prog, dayNight] = model.sunProgress
-    let temp = dayNight === 'day' ? prog : 1.0
+    (room: RoomModel, model: Model): Container<Msg> => {
+      const [prog, dayNight] = model.sunProgress
+      let temp = dayNight === 'day' ? prog : 1.0
 
-    const scene = resolveScenePrivateArea<KidRoomScenes>(model, room)
+      const scene = resolveScenePrivateArea<KidRoomScenes>(model, room)
 
-    const buttons_x3 = hashMap({
-      '1_single': 'off',
-      '2_single': 'dim',
-      '3_single': 'bright',
-    })
-    const payload = match<PrivateArea<KidRoomScenes>, Partial<ZLightPayload>>(
-      scene,
-    )
-      .with('off', 'none', () => ({ state: 'OFF' }))
-      .with('dim', () => ({
-        white: { brightness: 0.15, progress: temp, range: 'cosy' },
-      }))
-      .with('bright', 'on', () => ({
-        white: { brightness: 1.0, progress: temp, range: 'cosy' },
-      }))
-      .with('work', () => ({
-        white: { brightness: 1.0, progress: 0.5, range: 'work' },
-      }))
-      .exhaustive()
+      const buttons_x3 = hashMap({
+        '1_single': 'off',
+        '2_single': 'dim',
+        '3_single': 'bright',
+      })
+      const payload = match<PrivateArea<KidRoomScenes>, Partial<ZLightPayload>>(
+        scene,
+      )
+        .with('off', 'none', () => ({ state: 'OFF' }))
+        .with('dim', () => ({
+          white: { brightness: 0.15, progress: temp, range: 'cosy' },
+        }))
+        .with('bright', 'on', () => ({
+          white: { brightness: 1.0, progress: temp, range: 'cosy' },
+        }))
+        .with('work', () => ({
+          white: { brightness: 1.0, progress: 0.5, range: 'work' },
+        }))
+        .exhaustive()
 
-    return Room(
-      kid,
-      ZLight.make('light1', 'ikea', `${kid}/lamp`, payload),
-      ZButton.make('button2', `${kid}/buttonsx3`, SetRoomSceneMap(kid, buttons_x3)),
-    )
-  }
+      return Room(
+        kid,
+        ZLight.make('light1', 'ikea', `${kid}/lamp`, payload),
+        ZButton.make('button2', `${kid}/buttonsx3`, SetRoomSceneMap(kid, buttons_x3)),
+      )
+    }
 
 const pipers_room = kidRoom('pipers-room')
 const sams_room = kidRoom('sams-room')
