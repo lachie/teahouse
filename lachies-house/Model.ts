@@ -4,6 +4,12 @@ import { SensorReadingT } from './Msg'
 import { addDays, differenceInCalendarDays, addWeeks } from 'date-fns'
 import * as SunCalc from 'suncalc'
 
+const roomZero = <T = undefined>(extra: T): RoomModel & T => ({
+  occupied: false,
+  sensors: {},
+  scene: undefined,
+  ...extra,
+})
 export function initialModel(initialDate: Date): Model {
   return {
     doorbell: false,
@@ -19,39 +25,16 @@ export function initialModel(initialDate: Date): Model {
     houseScene: 'none',
     people: [],
     rooms: {
-      playroom: {
-        occupied: false,
-        sensors: {},
-        scene: undefined,
-      },
-      backroom: {
-        occupied: false,
-        sensors: {},
-        scene: undefined,
-      },
-      office: {
-        occupied: false,
-        sensors: {},
-        scene: undefined,
-      desk: {
-        command: 'idle',
-      }
-      },
-      bedroom: {
-        occupied: false,
-        sensors: {},
-        scene: undefined,
-      },
-      'sams-room': {
-        occupied: false,
-        sensors: {},
-        scene: undefined,
-      },
-      'pipers-room': {
-        occupied: false,
-        sensors: {},
-        scene: undefined,
-      },
+      playroom: roomZero({}),
+      backroom: roomZero({}),
+      office: roomZero({
+        desk: {
+          command: 'idle',
+        },
+      }),
+      bedroom: roomZero({}),
+      'sams-room': roomZero({}),
+      'pipers-room': roomZero({}),
     },
   }
 }
@@ -100,9 +83,12 @@ export type RoomModel = t.TypeOf<typeof RoomModelT>
 export const BackroomModelT = RoomModelT
 export type BackroomModel = RoomModel
 
-export const OfficeRoomModelT = t.intersection([RoomModelT, t.type({
-  desk: t.type({command: t.string})
-})])
+export const OfficeRoomModelT = t.intersection([
+  RoomModelT,
+  t.type({
+    desk: t.type({ command: t.string }),
+  }),
+])
 export type OfficeRoomModel = t.TypeOf<typeof OfficeRoomModelT>
 
 export const SunProgress = t.tuple([
@@ -174,7 +160,7 @@ export const modelZero: Model = {
       scene: undefined,
       desk: {
         command: 'idle',
-      }
+      },
     },
     bedroom: {
       occupied: false,
@@ -228,10 +214,10 @@ export type ModelCache = t.TypeOf<typeof ModelCacheT>
 
 const kidWeekReference = new Date('2021-08-21')
 
-export function adjustKidweek(from: Date, to: 'kid'|'non'): Date {
-  const kidWeek = isKidWeek(from) 
+export function adjustKidweek(from: Date, to: 'kid' | 'non'): Date {
+  const kidWeek = isKidWeek(from)
 
-  switch(to) {
+  switch (to) {
     case 'kid':
       return kidWeek ? from : addDays(from, 14)
     case 'non':

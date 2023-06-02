@@ -60,6 +60,33 @@ export type ZLightPayload = {
 }
 export type PartialPayload = Partial<ZLightPayload>
 
+export const white =
+  (base: Partial<WhiteSpec>) => (brightness = 1.0) => (progress: number): PartialPayload =>
+  ({
+    white: {
+      range: 'cosy',
+      brightness,
+      progress,
+      ...base,
+    },
+  })
+
+export const cosy = white({ range: 'cosy' })
+export const work = white({ range: 'work' })
+export const off = () => ({ state: 'OFF' })
+
+export const colour =
+  (color: ZColour, base: PartialPayload = {}) =>
+    (override: PartialPayload = {}): PartialPayload => ({
+      state: 'ON',
+      brightness: 255,
+      color,
+      ...base,
+      ...override,
+    })
+
+export const doorbell = colour({ r: 255, g: 0, b: 0 })
+
 export type ZLightNode = Node & {
   type: 'zLight'
   kind: LightKind
@@ -68,7 +95,11 @@ export type ZLightNode = Node & {
   payload: PartialPayload
 }
 
-export class ZLight<Msg> extends PublishingDevice<Msg, PartialPayload, ZLightNode> {
+export class ZLight<Msg> extends PublishingDevice<
+  Msg,
+  PartialPayload,
+  ZLightNode
+> {
   static make(
     key: string,
     kind: LightKind,

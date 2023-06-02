@@ -1,6 +1,5 @@
-
 // hash with default
-export const hashMap =
+export const hashTagger =
   <V, K extends string = string>(
     h: Record<K, V | undefined>,
     defaultKey: K | undefined = undefined,
@@ -9,7 +8,10 @@ export const hashMap =
     h[s as K] || (defaultKey && h[defaultKey])
 
 export const hashMapT =
-  <P extends Record<string,unknown>, H extends Record<string,Partial<P>> = Record<string,Partial<P>>>(
+  <
+    P extends Record<string, unknown>,
+    H extends Record<string, Partial<P>> = Record<string, Partial<P>>,
+  >(
     h: H,
     defaultKey: keyof H | undefined = undefined,
   ) =>

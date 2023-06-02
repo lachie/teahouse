@@ -13,12 +13,14 @@ import { Mqtt } from '../effects/mqtt'
 import { TelegramMessage, TelegramMessageNode } from './telegramBot'
 import { Secrets } from '../runtime'
 import { RoomMeta, RoomMetaNode } from './roomMeta'
+import { ShellyDimmer, ShellyDimmerNode } from './shellyDimmer'
 
 export { RFLight, PersonDetector, Metrics, ZLight, ZScene }
 
 type DeviceNode<Msg> =
   | RFLightNode
   | ZLightNode
+  | ShellyDimmerNode
   | PersonDetectorNode<Msg>
   | MetricsNode
   | ZButtonNode<Msg>
@@ -42,6 +44,7 @@ export class Devices<Msg> extends Device<DeviceNode<Msg>, Msg> {
       person: new Person<Msg>(secrets),
       rfLight: new RFLight(),
       zLight: new ZLight(),
+      shellyDimmer: new ShellyDimmer(),
       zButton: new ZButton(),
       zScene: new ZScene(),
       metrics: new Metrics(),
