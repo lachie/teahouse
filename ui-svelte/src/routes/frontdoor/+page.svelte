@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { model, modelValue } from '$lib/modelStore';
+	import { doorbellRinging } from '$lib/stores/doorbell';
 	import SceneButton from '$lib/components/SceneButton.svelte';
 	import Card from './Card.svelte';
 	import Sound from '$lib/components/Sound.svelte';
@@ -7,11 +8,26 @@
 	import MsgButton from '$lib/components/MsgButton.svelte';
 	import { Moon, BellSlash, Bell } from 'svelte-hero-icons';
 	import DayProgress from '$lib/components/DayProgress.svelte';
+	import { fully } from '$lib/fullyKiosk';
 
-	const doorbell = modelValue('doorbell');
+	console.log('doorbellRinging', $doorbellRinging);
+
+	$: if ($model && fully) {
+		if ($doorbellRinging) {
+			fully.stopScreensaver();
+			fully.showToast('door bell!');
+		}
+		const [progress, dayNight] = $model.sunProgress;
+
+		if (dayNight === 'night') {
+			fully.setScreenBrightness(50);
+		} else {
+			fully.setScreenBrightness(50 + 50 * progress);
+		}
+	}
 </script>
 
-{#if $doorbell}
+{#if $doorbellRinging}
 	<Sound src="/audio/doorbell-1.mp3" />
 {/if}
 
@@ -26,15 +42,11 @@
 	<Card>
 		<MsgButton
 			tagger={DoorbellCancel}
-			extraClass={$doorbell ? 'bg-red-400' : undefined}
-			icon={$doorbell ? BellSlash : Bell}
+			extraClass={$doorbellRinging ? 'bg-red-400' : undefined}
+			icon={$doorbellRinging ? BellSlash : Bell}
 		/>
 	</Card>
 	<Card>
 		<DayProgress model={$model} />
 	</Card>
 </div>
-
-<pre>
-    {JSON.stringify($model, null, 2)}
-</pre>
