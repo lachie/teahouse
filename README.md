@@ -5,7 +5,7 @@ https://guide.elm-lang.org/architecture/
 
 In teahouse, instead of `Html` the "view" is your house :)
 
-For a taste, take a look at [my house!](lachies-house.ts)
+For a taste, take a look at [my house!](lachies-house/house.ts)
 
 ## story
 
