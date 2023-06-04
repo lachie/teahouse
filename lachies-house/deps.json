@@ -1,0 +1,6 @@
+[
+    "suncalc",
+    "date-fns",
+    "object-path-immutable",
+    "fp-ts"
+]
