@@ -281,9 +281,9 @@ const playroom = commonRoom<PlayroomScenes>(({ scene, progress }): Container<Msg
     'playroom',
     ZLight.make('light1', 'ikea', 'playroom/lamp-desk', payload1),
     ZLight.make('light2', 'ikea', 'playroom/lamp-tall', payload1),
-    ZLight.make('light3a', 'ikea', 'playroom/spot-1', payload1),
-    ZLight.make('light3b', 'ikea', 'playroom/spot-2', payload2),
-    ZLight.make('light3c', 'ikea', 'playroom/spot-3', payload1),
+    ZLight.make('light3a', 'ikea-spot', 'playroom/spot-1', payload1),
+    ZLight.make('light3b', 'ikea-spot', 'playroom/spot-2', payload2),
+    ZLight.make('light3c', 'ikea-spot', 'playroom/spot-3', payload1),
     ZButton.make(
       'button1',
       'playroom/buttonsx3-1',
