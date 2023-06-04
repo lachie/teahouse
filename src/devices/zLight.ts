@@ -61,7 +61,7 @@ export type ZLightPayload = {
 export type PartialPayload = Partial<ZLightPayload>
 
 export const white =
-  (base: Partial<WhiteSpec>) => (brightness = 1.0) => (progress: number): PartialPayload =>
+  (base: Partial<WhiteSpec>) => (brightness = 1.0) => (progress: number): Partial<ZLightPayload> =>
   ({
     white: {
       range: 'cosy',
@@ -115,6 +115,21 @@ export class ZLight<Msg> extends PublishingDevice<
     }
   }
 
+  static off = { state: 'OFF' }
+  static doorbell = {
+    state: 'ON',
+    brightness: 255,
+    color: { r: 255, g: 255, b: 255 },
+  }
+  static cosy(brightness: number, progress: number): Partial<ZLightPayload> {
+    return {
+      white: { brightness, progress, range: 'cosy' },
+    }
+  }
+  static work: Partial<ZLightPayload> = {
+    white: { brightness: 1.0, progress: 0.5, range: 'work' }, // noon
+  }
+
   parsePayload({ payload, kind }: ZLightNode): Record<string, unknown> {
     const def = lightDefs[kind]
     let p = {}
@@ -126,16 +141,6 @@ export class ZLight<Msg> extends PublishingDevice<
       const tempScale = sawNorm(
         def.warmest * warmScale,
         def.coolest * coolScale,
-      )
-
-      console.log(
-        kind,
-        'temp',
-        progress,
-        tempScale(progress),
-        tempScale(0),
-        tempScale(0.5),
-        tempScale(1.0),
       )
 
       p = {

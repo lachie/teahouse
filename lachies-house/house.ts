@@ -1,14 +1,8 @@
 import { match } from 'ts-pattern'
 
 import { Container, Room } from '../src/house'
-
-import { ZLight } from '../src/devices'
+import { ZLight } from '../src/devices/zLight'
 import {
-  colour,
-  cosy,
-  white,
-  doorbell as doorbellLight,
-  off as lightOff,
   ZLightPayload,
 } from '../src/devices/zLight'
 
@@ -23,7 +17,6 @@ import {
   Msg,
   SetSensorRaw,
   SetRoomSceneMap,
-  PushEvent,
   SetSetValue,
   SetDelValue,
   DoorbellTrigger,
@@ -34,12 +27,7 @@ import { ZPresence, ZTemp } from '../src/devices/zSensor'
 import { TelegramMessage } from '../src/devices/telegramBot'
 import { Person } from '../src/devices/person'
 import { DeskCommand, DeskCtl } from '../src/devices/deskctl'
-import { RoomMeta } from '../src/devices/roomMeta'
-import { mergeDeep } from 'immutable'
-import { Match } from 'ts-pattern/lib/types/Match'
-import { reifyNode } from '../src/runtime'
 import { ShellyDimmer, ShellyDimmerPayload } from '../src/devices/shellyDimmer'
-import { DevicePayload, MatchLine, match as matchScene } from './scenes'
 
 /*
  * house
@@ -54,7 +42,7 @@ type CommonArea<P> = P | GlobalScenes | CommonAreaScenes
 
 /*
  House is the top level container.
- It may be passed to runtime.
+ It's used by the runtime to set up all the devices.
  */
 export const house = (model: Model): Container<Msg> => ({
   type: 'house',
@@ -71,9 +59,9 @@ export const house = (model: Model): Container<Msg> => ({
   ],
 })
 
-/*
-Global is a virtual "room" to hold the people who may be home.
-*/
+/**
+ * Global is a virtual "room" to hold the people who may be home.
+ */
 const global = (_: Model): Container<Msg> => {
   const person = (key: keyof typeof People) =>
     Person.make(
@@ -123,6 +111,16 @@ const resolveSceneCommonArea = <RoomScenes>(
 
   return 'none'
 }
+type CommonRoomProps<S extends string> = { model: Model, room: RoomModel, scene: CommonArea<S>, progress: number }
+type CommonRoom<S extends string> = (props: CommonRoomProps<S>) => Container<Msg>
+const commonRoom = <S extends string>(roomFn: CommonRoom<S>) => (room: RoomModel, model: Model): Container<Msg> => {
+  const scene = resolveSceneCommonArea<S>(model, room)
+
+  const [prog, dayNight] = model.sunProgress
+  let progress = dayNight === 'day' ? prog : 1.0
+
+  return roomFn({ model, room, scene, progress })
+}
 
 const resolveScenePrivateArea = <RoomScenes>(
   _: Model,
@@ -135,139 +133,65 @@ const resolveScenePrivateArea = <RoomScenes>(
   return room.scene as unknown as PrivateArea<RoomScenes>
 }
 
-// const matchCommonArea = <T extends DevicePayload[]>(model: Model, room: RoomModel, arity: number, matches: MatchLine<T>[]) => matchScene(model, room, resolveSceneCommonArea, arity, [
-//   [['off', 'none'], { state: 'OFF' }],
-//   ['doorbell',
-//     {
-//       state: 'ON',
-//       color: { r: 255, g: 0, b: 0 },
-//       brightness: 255,
-//     },
-//   ],
-//   ...matches
-// ])
+type PrivateRoomProps<S extends string> = { model: Model, room: RoomModel, scene: PrivateArea<S>, progress: number }
+type PrivateRoom<S extends string> = (props: PrivateRoomProps<S>) => Container<Msg>
+const privateRoom = <S extends string>(roomFn: PrivateRoom<S>) => (room: RoomModel, model: Model): Container<Msg> => {
+  const scene = resolveScenePrivateArea<S>(model, room)
 
-type MultiPayload<T> = Partial<T>[] | Partial<T>
-function unroll<T>(n: number, p: MultiPayload<T>): Partial<T>[] {
-  if ('length' in p) {
-    return p
-  } else {
-    return Array(n).fill(p)
-  }
+  const [prog, dayNight] = model.sunProgress
+  let progress = dayNight === 'day' ? prog : 1.0
+
+  return roomFn({ model, room, scene, progress })
 }
 
 /*
  * Specific rooms
  */
+const backroomScenes = ['dim', 'bright', 'work'] as const
+type BackroomScenes = typeof backroomScenes[number]
 
-/*
- * My backroom, where I mostly hang out and watch tv.
- */
-// const backroom2 = (room: RoomModel, model: Model): Container<Msg> => {
-//   const buttons = hashTagger({
-//     '1_single': 'off',
-//     '2_single': 'dim',
-//     '3_single': 'bright',
-//   })
-
-//   const [, payload, payload2] = matchCommonArea<[Partial<ZLightPayload>, Partial<ZLightPayload>]>(model, room, 2, [
-//     ['dim', cosy(0.3), cosy(0.3 * 0.2)],
-//     [['bright', 'bedtime', 'on'], cosy(1.1), cosy(1.0 * 0.15)],
-//     [
-//       'work',
-//       {
-//         white: { brightness: 1.0, progress: 0.5, range: 'work' },
-//       },
-//     ],
-//   ])
-
-//   return Room(
-//     'backroom',
-//     ZLight.make('light1', 'ikea', 'backroom/lamp', payload),
-//     ZLight.make('spot1', 'ikea-spot', 'backroom/spot-1', payload),
-//     ZLight.make('spot2', 'ikea-spot', 'backroom/spot-2', payload),
-//     ZLight.make('spot3', 'ikea-spot', 'backroom/spot-3', payload2),
-//     ZLight.make('spot4', 'ikea-spot', 'backroom/spot-4', payload2),
-//     ZButton.make(
-//       'button1',
-//       'backroom/buttonsx3-1',
-//       SetRoomSceneMap('backroom', buttons),
-//     ),
-//     ZPresence.make('backroom', 'backroom/motion', SetSensorRaw('backroom')),
-//     ZTemp.make('backroom', 'backroom/temp', SetSensorRaw('backroom')),
-//   )
-// }
-
-type BackroomScenes = 'dim' | 'bright' | 'work'
-const backroom = (room: RoomModel, model: Model): Container<Msg> => {
-  const [prog, dayNight] = model.sunProgress
-  let progress = dayNight === 'day' ? prog : 1.0
-
+const backroom = commonRoom<BackroomScenes>(({ progress, scene }): Container<Msg> => {
   const buttons = hashTagger({
     '1_single': 'off',
     '2_single': 'dim',
     '3_single': 'bright',
   })
 
-  const scene = resolveSceneCommonArea<BackroomScenes>(model, room)
-
   type Payloads = [
     Partial<ZLightPayload>,
     Partial<ZLightPayload>,
-    Partial<ShellyDimmerPayload>,
+    ShellyDimmerPayload,
   ]
   const [payload, payload2, payloadSink] = match<
     CommonArea<BackroomScenes>,
     Payloads
   >(scene)
     .with('off', 'none', () => [
-      { state: 'OFF' },
-      { state: 'OFF' },
+      ZLight.off,
+      ZLight.off,
       { state: false },
     ])
     .with('doorbell', () => [
-      {
-        state: 'ON',
-        color: { r: 255, g: 0, b: 0 },
-        brightness: 255,
-      },
-      {
-        state: 'ON',
-        color: { r: 255, g: 0, b: 0 },
-        brightness: 255 * 0.25,
-      },
+      ZLight.doorbell,
+      ZLight.doorbell,
       { state: true },
     ])
     .with('dim', () => [
-      {
-        white: { brightness: 0.3, progress, range: 'cosy' },
-      },
-      {
-        white: { brightness: 0.3 * 0.2, progress, range: 'cosy' },
-      },
+      ZLight.cosy(0.3, progress),
+      ZLight.cosy(0.3 * 0.2, progress),
       { state: true },
     ])
     .with('bright', 'bedtime', 'on', () => [
-      {
-        white: { brightness: 1.0, progress, range: 'cosy' },
-      },
-      {
-        white: { brightness: 1.0 * 0.15, progress, range: 'cosy' },
-      },
+      ZLight.cosy(1.0, progress),
+      ZLight.cosy(1.0 * 0.15, progress),
       { state: true },
     ])
     .with('work', () => [
-      {
-        white: { brightness: 1.0, progress: 0.5, range: 'work' }, // noon
-      },
-      {
-        white: { brightness: 1.0, progress: 0.5, range: 'work' },
-      },
+      ZLight.work,
+      ZLight.work,
       { state: true },
     ])
     .exhaustive()
-
-  console.log('backroom', payloadSink)
 
   return Room(
     'backroom',
@@ -285,144 +209,40 @@ const backroom = (room: RoomModel, model: Model): Container<Msg> => {
     ZPresence.make('backroom', 'backroom/motion', SetSensorRaw('backroom')),
     ZTemp.make('backroom', 'backroom/temp', SetSensorRaw('backroom')),
   )
-}
+})
 
 /*
  * My bedroom
+ * It's set up as a common area so I get doorbell blinks.
  */
 type BedroomScenes =
   | 'dim'
-  | 'morning2'
   | 'bright'
   | 'work'
-  | 'purple'
-  | 'blue'
-  | 'on'
+  | 'doorbell'
   | 'off'
-const bedroom = (room: RoomModel, model: Model): Container<Msg> => {
-  const [prog, dayNight] = model.sunProgress
-  let temp = dayNight === 'day' ? prog : 1.0
-
-  const scene = resolveSceneCommonArea<OfficeScenes>(model, room)
-
-  const buttons = hashTagger({
-    '1_single': 'off',
-    '2_single': 'dim',
-    '2_double': 'morning2',
-    '3_single': 'bright',
-    '4_single': 'purple',
-    '4_double': 'blue',
-  })
-  const buttons_x3 = hashTagger({
-    '1_single': 'off',
-    '2_single': 'dim',
-    '3_single': 'bright',
-  })
-  const payload = match<CommonArea<OfficeScenes>, Partial<ZLightPayload>>(scene)
-    .with('off', 'none', () => ({ state: 'OFF' }))
-    .with('dim', () => ({
-      white: { brightness: 0.15, progress: temp, range: 'cosy' },
-    }))
-    .with('morning2', () => ({
-      white: { brightness: 0.3, progress: temp, range: 'cosy' },
-    }))
-    .with('bright', 'bedtime', 'on', () => ({
-      white: { brightness: 1.0, progress: temp, range: 'cosy' },
-    }))
-    .with('work', () => ({
-      white: { brightness: 1.0, progress: 0.5, range: 'work' },
-    }))
-    .with('purple', () => ({
-      state: 'ON',
-      brightness: 100,
-      color: { r: 204, g: 24, b: 195 },
-    }))
-    .with('blue', () => ({
-      state: 'ON',
-      brightness: 100,
-      color: { r: 2, g: 109, b: 163 },
-    }))
-    .with('doorbell', () => ({
-      state: 'ON',
-      color: { r: 255, g: 0, b: 0 },
-      brightness: 255,
-    }))
+const bedroom = commonRoom<BackroomScenes>(({ scene, progress }): Container<Msg> => {
+  const payload = match<CommonArea<BedroomScenes>, Partial<ZLightPayload>>(scene)
+    .with('off', 'none', () => ZLight.off)
+    .with('doorbell', () => ZLight.doorbell) // yeah, doorbell blinking in my room
+    .with('dim', () => ZLight.cosy(0.15, progress))
+    .with('bright', 'bedtime', 'on', () => ZLight.cosy(1.0, progress))
+    .with('work', () => ZLight.work)
     .exhaustive()
 
   return Room(
     'bedroom',
     ZLight.make('light1', 'ikea', 'bedroom/lamp', payload),
-    // ZLight.make('light2', 'ikea', 'office/lamp-small', payload),
-    // ZButton.make('button1', 'switch-x4', SetScene('office', buttons)),
-    // ZButton.make('button2', 'office/buttonsx3', SetScene('office', buttons_x3)),
-    // ZTemp.make('office', 'office/temp', SetSensorRaw('office')),
   )
-}
+})
 
 /*
  * My office
  */
 type OfficeScenes = 'dim' | 'morning2' | 'bright' | 'work' | 'purple' | 'blue'
 const office = (room: OfficeRoomModel, model: Model): Container<Msg> => {
-  const [prog, dayNight] = model.sunProgress
-  let temp = dayNight === 'day' ? prog : 1.0
-
-  const scene = resolveSceneCommonArea<OfficeScenes>(model, room)
-
-  const buttons = hashTagger({
-    '1_single': 'off',
-    '2_single': 'dim',
-    '2_double': 'morning2',
-    '3_single': 'bright',
-    '4_single': 'purple',
-    '4_double': 'blue',
-  })
-  const buttons_x3 = hashTagger({
-    '1_single': 'off',
-    '2_single': 'dim',
-    '3_single': 'bright',
-  })
-  const payload = match<CommonArea<OfficeScenes>, Partial<ZLightPayload>>(scene)
-    .with('off', 'none', () => ({ state: 'OFF' }))
-    .with('dim', () => ({
-      white: { brightness: 0.15, progress: temp, range: 'cosy' },
-    }))
-    .with('morning2', () => ({
-      white: { brightness: 0.3, progress: temp, range: 'cosy' },
-    }))
-    .with('bright', 'bedtime', 'on', () => ({
-      white: { brightness: 1.0, progress: temp, range: 'cosy' },
-    }))
-    .with('work', () => ({
-      white: { brightness: 1.0, progress: 0.5, range: 'work' },
-    }))
-    .with('purple', () => ({
-      state: 'ON',
-      brightness: 100,
-      color: { r: 204, g: 24, b: 195 },
-    }))
-    .with('blue', () => ({
-      state: 'ON',
-      brightness: 100,
-      color: { r: 2, g: 109, b: 163 },
-    }))
-    .with('doorbell', () => ({
-      state: 'ON',
-      color: { r: 255, g: 0, b: 0 },
-      brightness: 255,
-    }))
-    .exhaustive()
-
   return Room(
     'office',
-    ZLight.make('light1', 'ikea', 'office/lamp', payload),
-    ZLight.make('light2', 'ikea', 'office/lamp-small', payload),
-    ZButton.make('button1', 'switch-x4', SetRoomSceneMap('office', buttons)),
-    ZButton.make(
-      'button2',
-      'office/buttonsx3',
-      SetRoomSceneMap('office', buttons_x3),
-    ),
     ZTemp.make('office', 'office/temp', SetSensorRaw('office')),
     DeskCtl.make('office', 'office/desk', room.desk.command as DeskCommand),
   )
@@ -432,31 +252,30 @@ const office = (room: OfficeRoomModel, model: Model): Container<Msg> => {
  * The 'playroom' where the kids do homework and we all game.
  */
 type PlayroomScenes = 'dim' | 'bright' | 'work'
-const playroom = (room: RoomModel, model: Model): Container<Msg> => {
-  const [prog, dayNight] = model.sunProgress
-  let progress = dayNight === 'day' ? prog : 1.0
-
+const playroom = commonRoom<PlayroomScenes>(({ scene, progress }): Container<Msg> => {
   const buttons = hashTagger({
     '1_single': 'off',
     '2_single': 'dim',
     '3_single': 'bright',
   })
-  const scene = resolveSceneCommonArea<PlayroomScenes>(model, room)
+
+  type Payloads = [Partial<ZLightPayload>, Partial<ZLightPayload>]
+
   const payload = match<
     CommonArea<PlayroomScenes>,
-    MultiPayload<ZLightPayload>
+    Payloads
   >(scene)
-    .with('off', 'none', 'bedtime', lightOff)
-    .with('doorbell', doorbellLight)
-    .with('dim', () => cosy(0.3)(progress))
-    .with('bright', 'on', () => [
-      cosy(1.0)(progress),
-      cosy(0.15)(progress),
-    ])
-    .with('work', white({ range: 'work' })(1.0))
+    .with('off', 'none', 'bedtime', () => [ZLight.off, ZLight.off])
+    .with('doorbell', () => [ZLight.doorbell, ZLight.doorbell])
+    .with('dim', () => ([ZLight.cosy(0.3, progress), ZLight.cosy(0.3, progress)]))
+    .with('bright', 'on', () => ([
+      ZLight.cosy(1.0, progress),
+      ZLight.cosy(0.15, progress),
+    ]))
+    .with('work', () => ([ZLight.work, ZLight.work]))
     .exhaustive()
 
-  const [payload1, payload2] = unroll(2, payload)
+  const [payload1, payload2] = payload
 
   return Room(
     'playroom',
@@ -478,6 +297,7 @@ const playroom = (room: RoomModel, model: Model): Container<Msg> => {
     ZTemp.make('playroom', 'playroom/temp', SetSensorRaw('playroom')),
   )
 }
+)
 
 /*
  * The kids' bedrooms. Behaviour is the same, so its parameterised into a function and reified below.
@@ -485,12 +305,7 @@ const playroom = (room: RoomModel, model: Model): Container<Msg> => {
 type KidRoomScenes = 'dim' | 'bright' | 'work'
 const kidRoom =
   (kid: string) =>
-    (room: RoomModel, model: Model): Container<Msg> => {
-      const [prog, dayNight] = model.sunProgress
-      let temp = dayNight === 'day' ? prog : 1.0
-
-      const scene = resolveScenePrivateArea<KidRoomScenes>(model, room)
-
+    privateRoom<KidRoomScenes>(({ scene, progress }) => {
       const buttons_x3 = hashTagger({
         '1_single': 'off',
         '2_single': 'dim',
@@ -499,16 +314,10 @@ const kidRoom =
       const payload = match<PrivateArea<KidRoomScenes>, Partial<ZLightPayload>>(
         scene,
       )
-        .with('off', 'none', () => ({ state: 'OFF' }))
-        .with('dim', () => ({
-          white: { brightness: 0.15, progress: temp, range: 'cosy' },
-        }))
-        .with('bright', 'on', () => ({
-          white: { brightness: 1.0, progress: temp, range: 'cosy' },
-        }))
-        .with('work', () => ({
-          white: { brightness: 1.0, progress: 0.5, range: 'work' },
-        }))
+        .with('off', 'none', () => ZLight.off)
+        .with('dim', () => ZLight.cosy(0.15, progress))
+        .with('bright', 'on', () => ZLight.cosy(1.0, progress))
+        .with('work', () => ZLight.work)
         .exhaustive()
 
       return Room(
@@ -520,7 +329,7 @@ const kidRoom =
           SetRoomSceneMap(kid, buttons_x3),
         ),
       )
-    }
+    })
 
 const pipers_room = kidRoom('pipers-room')
 const sams_room = kidRoom('sams-room')
