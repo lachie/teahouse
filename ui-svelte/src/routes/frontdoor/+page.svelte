@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { model, modelValue } from '$lib/modelStore';
+	import { model, modelValue } from '$lib/stores/modelStore';
 	import { doorbellRinging } from '$lib/stores/doorbell';
 	import SceneButton from '$lib/components/SceneButton.svelte';
 	import Card from './Card.svelte';

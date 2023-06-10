@@ -1,6 +1,6 @@
 <script lang="ts">
 	import MsgButton from '$lib/components/MsgButton.svelte';
-	import { model } from '$lib/modelStore';
+	import { model } from '$lib/stores/modelStore';
 	import { DoorbellCancel, DoorbellTrigger, LeaveHouse } from '$lib/lachies-house/Msg';
 	import { Bell, BellSlash } from 'svelte-hero-icons';
 	import { doorbellRinging } from '$lib/stores/doorbell';

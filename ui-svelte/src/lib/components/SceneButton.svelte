@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { dispatchMsgTaggerSync } from '$lib/dispatchMsg';
 	import type { SetRoomScene } from '$lib/lachies-house/Msg';
-	import { roomScene } from '$lib/modelStore';
+	import { roomScene } from '$lib/stores/modelStore';
 	import { LightBulb } from 'svelte-hero-icons';
 	import ControlButton from './ControlButton.svelte';
 

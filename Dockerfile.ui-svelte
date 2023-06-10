@@ -1,19 +1,21 @@
 FROM node:lts AS build
 
 WORKDIR /app
-ADD ./ui-svelte/package.json ./ui-svelte/yarn.lock /app
+ADD ./ui-svelte/package.json ./ui-svelte/yarn.lock /app/
 RUN yarn install
 
-ADD ./ui-svelte /app
+ADD ./ui-svelte/ /app
 RUN rm -f /app/src/lib/lachies-house
-ADD ./lachies-house /app/src/lib/lachies-house
+ADD ./lachies-house/ /app/src/lib/lachies-house/
+
 RUN yarn build
 
 FROM node:lts
 
 WORKDIR /app
-COPY --from=build /app/build /app
-COPY --from=build /app/package.json /app/yarn.lock /app
-
+ADD ./ui-svelte/package.json ./ui-svelte/yarn.lock /app/
 RUN yarn install --prod
+
+COPY --from=build /app/build/ /app/
+
 CMD ["node", "."]

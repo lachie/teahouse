@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { model } from '$lib/modelStore';
+	import { model } from '$lib/stores/modelStore';
 </script>
 
 <pre>

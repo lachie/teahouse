@@ -36,12 +36,8 @@
 	"type": "module",
 	"dependencies": {
 		"date-fns": "^2.30.0",
-		"fp-ts": "^2.16.0",
-		"io-ts": "^2.2.20",
-		"io-ts-types": "^0.5.19",
-		"monocle-ts": "^2.3.13",
-		"newtype-ts": "^0.3.5",
 		"smelte": "^1.1.8",
-		"suncalc": "^1.9.0"
+		"suncalc": "^1.9.0",
+		"zod": "^3.21.4"
 	}
 }
