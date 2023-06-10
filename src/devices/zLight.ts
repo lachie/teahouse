@@ -115,11 +115,11 @@ export class ZLight<Msg> extends PublishingDevice<
     }
   }
 
-  static off = { state: 'OFF' }
-  static doorbell = {
+  static off: Partial<ZLightPayload> = { state: 'OFF' }
+  static doorbell: Partial<ZLightPayload> = {
     state: 'ON',
     brightness: 255,
-    color: { r: 255, g: 255, b: 255 },
+    color: { r: 255, g: 0, b: 0 },
   }
   static cosy(brightness: number, progress: number): Partial<ZLightPayload> {
     return {
