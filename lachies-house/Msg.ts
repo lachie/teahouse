@@ -1,66 +1,65 @@
-import * as t from 'io-ts'
-import * as tt from 'io-ts-types'
+import * as z from 'zod'
 
 /*
  * message
  */
 
-export const LeaveHouseT = t.type({
-  type: t.literal('leave-house'),
+export const LeaveHouseT = z.object({
+  type: z.literal('leave-house'),
 })
-export type LeaveHouse = t.TypeOf<typeof LeaveHouseT>
+export type LeaveHouse = z.infer<typeof LeaveHouseT>
 export const LeaveHouse = (): LeaveHouse => ({ type: 'leave-house' })
 
-export const BedtimeT = t.type({
-  type: t.literal('house-bedtime'),
+export const BedtimeT = z.object({
+  type: z.literal('house-bedtime'),
 })
-export type Bedtime = t.TypeOf<typeof BedtimeT>
+export type Bedtime = z.infer<typeof BedtimeT>
 export const Bedtime = (): Bedtime => ({ type: 'house-bedtime' })
 
-export const DoorbellTriggerT = t.type({
-  type: t.literal('doorbell-trigger'),
+export const DoorbellTriggerT = z.object({
+  type: z.literal('doorbell-trigger'),
 })
-export type DoorbellTrigger = t.TypeOf<typeof DoorbellTriggerT>
+export type DoorbellTrigger = z.infer<typeof DoorbellTriggerT>
 export const DoorbellTrigger = (): DoorbellTrigger => ({ type: 'doorbell-trigger' })
 
-export const DoorbellCancelT = t.type({
-  type: t.literal('doorbell-cancel'),
+export const DoorbellCancelT = z.object({
+  type: z.literal('doorbell-cancel'),
 })
-export type DoorbellCancel = t.TypeOf<typeof DoorbellCancelT>
+export type DoorbellCancel = z.infer<typeof DoorbellCancelT>
 export const DoorbellCancel = (): DoorbellCancel => ({ type: 'doorbell-cancel' })
 
-export const ToggleRoomSceneT = t.type({
-  type: t.literal('toggle-room-scene'),
-  room: t.string,
+export const ToggleRoomSceneT = z.object({
+  type: z.literal('toggle-room-scene'),
+  room: z.string(),
 })
-export type ToggleRoomScene = t.TypeOf<typeof ToggleRoomSceneT>
+export type ToggleRoomScene = z.infer<typeof ToggleRoomSceneT>
 export const ToggleRoomScene = (room: string) => (): ToggleRoomScene => ({ type: 'toggle-room-scene', room })
 
 
-export const SetOccupancyT = t.type({
-  type: t.literal('set-occupancy'),
-  room: t.string,
-  occupied: t.boolean,
+export const SetOccupancyT = z.object({
+  type: z.literal('set-occupancy'),
+  room: z.string(),
+  occupied: z.boolean(),
 })
 
-export type SetOccupancy = t.TypeOf<typeof SetOccupancyT>
+export type SetOccupancy = z.infer<typeof SetOccupancyT>
 // type SetOccupancy = { type: 'set-occupancy'; room: string; occupied: boolean }
 export const SetOccupancy =
   (room: string) =>
-  (occupied: boolean): SetOccupancy => ({
-    type: 'set-occupancy',
-    room,
-    occupied,
-  })
+    (occupied: boolean): SetOccupancy => ({
+      type: 'set-occupancy',
+      room,
+      occupied,
+    })
 
 // SetScene
-export const SetRoomSceneT = t.type({
-  type: t.literal('set-scene'),
-  room: t.string,
-  scene: t.union([t.string, t.undefined]),
+export const SetRoomSceneT = z.object({
+  type: z.literal('set-scene'),
+  room: z.string(),
+  scene: z.string().optional(),
 })
 
-export type SetRoomScene = t.TypeOf<typeof SetRoomSceneT>
+export type SetRoomScene = z.infer<typeof SetRoomSceneT>
 export const SetRoomScene = (room: string, scene: string | undefined) => (): SetRoomScene => ({
   type: 'set-scene',
   room,
@@ -69,20 +68,20 @@ export const SetRoomScene = (room: string, scene: string | undefined) => (): Set
 
 export const SetRoomSceneMap =
   (room: string, tagScene: (action: string) => string | undefined = (x) => x) =>
-  (action: string): SetRoomScene => ({
-    type: 'set-scene',
-    room,
-    scene: tagScene(action),
-  })
+    (action: string): SetRoomScene => ({
+      type: 'set-scene',
+      room,
+      scene: tagScene(action),
+    })
 
 // SetPresence
-// export const SetDataT = t.type({
+// export const SetDataT = z.object({
 //   type: t.literal('set-data'),
 //   room: t.string,
 //   data: t.UnknownRecord
 // })
 
-// export type SetData = t.TypeOf<typeof SetDataT>
+// export type SetData = z.infer<typeof SetDataT>
 // export const SetData =
 //   (room: string) =>
 //   (data: Record<string,unknown>): SetData => ({
@@ -91,66 +90,68 @@ export const SetRoomSceneMap =
 //     data
 // })
 
-export const SensorReadingT = t.union([t.string, t.number, t.boolean])
-export type SensorReading = t.TypeOf<typeof SensorReadingT>
+export const SensorReadingT = z.union([z.string(), z.number(), z.boolean()])
+export type SensorReading = z.infer<typeof SensorReadingT>
 
-export const SetSensorRawT = t.type({
-  type: t.literal('set-sensor-raw'),
-  room: t.string,
-  readings: t.UnknownRecord,
+export const SetSensorRawT = z.object({
+  type: z.literal('set-sensor-raw'),
+  room: z.string(),
+  readings: z.record(z.unknown()),
 })
-export type SetSensorRaw = t.TypeOf<typeof SetSensorRawT>
+export type SetSensorRaw = z.infer<typeof SetSensorRawT>
 export const SetSensorRaw =
   (room: string) =>
-  (readings: Record<string, unknown>): SetSensorRaw => ({
-    type: 'set-sensor-raw',
-    room,
-    readings,
-  })
+    (readings: Record<string, unknown>): SetSensorRaw => ({
+      type: 'set-sensor-raw',
+      room,
+      readings,
+    })
 
-const ImmutablePath = t.union([
-  t.string,
-  t.readonlyArray(t.union([t.string, t.number])),
+const ImmutablePath = z.union([
+  z.string(),
+  z.array(z.union([z.string(), z.number()])),
 ])
+type ImmutablePath = z.infer<typeof ImmutablePath>
 // type Path = string | ReadonlyArray<number | string>;
 
-export const SetValueT = t.type({
-  type: t.literal('set-value'),
+export const SetValueT = z.object({
+  type: z.literal('set-value'),
   key: ImmutablePath,
-  value: t.unknown,
+  value: z.unknown(),
 })
-export type SetValue = t.TypeOf<typeof SetValueT>
+export type SetValue = z.infer<typeof SetValueT>
 export const SetValue =
-  (key: Path) =>
-  (value: unknown): SetValue => ({ type: 'set-value', key, value })
+  (key: ImmutablePath) =>
+    (value: unknown): SetValue => ({ type: 'set-value', key, value })
 export const SetConst =
-  (key: Path, value: unknown) =>
-  (..._: unknown[]): SetValue => ({ type: 'set-value', key, value })
+  (key: ImmutablePath, value: unknown) =>
+    (..._: unknown[]): SetValue => ({ type: 'set-value', key, value })
 
 const zip = <A, B>(as: A[], bs: B[]): [A, B][] => as.map((a, i) => [a, bs[i]])
-export const SetValuesT = t.type({
-  type: t.literal('set-values'),
-  keyValues: t.readonlyArray(t.tuple([ImmutablePath, t.unknown])),
+
+export const SetValuesT = z.object({
+  type: z.literal('set-values'),
+  keyValues: z.array(z.tuple([ImmutablePath, z.unknown()])),
 })
-export type SetValues = t.TypeOf<typeof SetValuesT>
+export type SetValues = z.infer<typeof SetValuesT>
 export const SetValues =
-  (keys: Path[]) =>
-  (values: unknown[]): SetValues => ({
-    type: 'set-values',
-    keyValues: zip(keys, values),
-  })
+  (keys: ImmutablePath[]) =>
+    (values: unknown[]): SetValues => ({
+      type: 'set-values',
+      keyValues: zip(keys, values),
+    })
 export const SetConsts =
-  (keyValues: [Path, unknown][]) =>
-  (..._: unknown[]): SetValues => ({ type: 'set-values', keyValues })
+  (keyValues: [ImmutablePath, unknown][]) =>
+    (..._: unknown[]): SetValues => ({ type: 'set-values', keyValues })
 
 // sets
-export const SetSetT = t.type({
-  type: t.literal('set-set'),
-  key: t.string,
-  value: t.string,
-  clear: t.boolean,
+export const SetSetT = z.object({
+  type: z.literal('set-set'),
+  key: z.string(),
+  value: z.string(),
+  clear: z.boolean(),
 })
-export type SetSet = t.TypeOf<typeof SetSetT>
+export type SetSet = z.infer<typeof SetSetT>
 export const SetSetValue = (key: string, value: string) => (): SetSet => ({
   type: 'set-set',
   key,
@@ -164,83 +165,83 @@ export const SetDelValue = (key: string, value: string) => (): SetSet => ({
   clear: true,
 })
 
-export const ClearValueT = t.type({
-  type: t.literal('clear-value'),
+export const ClearValueT = z.object({
+  type: z.literal('clear-value'),
   key: ImmutablePath,
 })
-export type ClearValue = t.TypeOf<typeof ClearValueT>
-export const ClearValue = (key: Path): ClearValue => ({
+export type ClearValue = z.infer<typeof ClearValueT>
+export const ClearValue = (key: ImmutablePath): ClearValue => ({
   type: 'clear-value',
   key,
 })
 
-export const PushEventT = t.type({
-  type: t.literal('push-event'),
+export const PushEventT = z.object({
+  type: z.literal('push-event'),
   path: ImmutablePath,
-  event: t.string,
-  at: tt.DateFromISOString,
+  event: z.string(),
+  at: z.coerce.date(),
 })
-export type PushEvent = t.TypeOf<typeof PushEventT>
-export const PushEvent = (path: Path, event: string) => (): PushEvent => ({
+export type PushEvent = z.infer<typeof PushEventT>
+export const PushEvent = (path: ImmutablePath, event: string) => (): PushEvent => ({
   type: 'push-event',
   path,
   event,
   at: new Date(),
 })
 
-export const ToggleBoolT = t.type({
-  type: t.literal('toggle-bool'),
-  key: t.string,
+export const ToggleBoolT = z.object({
+  type: z.literal('toggle-bool'),
+  key: z.string(),
 })
-export type ToggleBool = t.TypeOf<typeof ToggleBoolT>
+export type ToggleBool = z.infer<typeof ToggleBoolT>
 export const ToggleBool = (key: string) => (): ToggleBool => ({
   type: 'toggle-bool',
   key,
 })
 
-export const LightStateT = t.keyof({ on: null, off: null, detect: null })
-export type LightState = t.TypeOf<typeof LightStateT>
+export const LightStateT = z.enum(['on', 'off', 'detect'])
+export type LightState = z.infer<typeof LightStateT>
 export const LightStates: LightState[] = ['on', 'off', 'detect']
 
-export const SetLightOnT = t.type({
-  type: t.literal('set-light-on'),
-  room: t.string,
+export const SetLightOnT = z.object({
+  type: z.literal('set-light-on'),
+  room: z.string(),
   lightOn: LightStateT,
 })
-export type SetLightOn = t.TypeOf<typeof SetLightOnT>
+export type SetLightOn = z.infer<typeof SetLightOnT>
 export const SetLightOn =
   (room: string) =>
-  (lightOn: LightState): SetLightOn => ({
-    type: 'set-light-on',
-    room,
-    lightOn,
-  })
+    (lightOn: LightState): SetLightOn => ({
+      type: 'set-light-on',
+      room,
+      lightOn,
+    })
 
-export const ToggleLightT = t.type({
-  type: t.literal('toggle-light'),
-  room: t.string,
+export const ToggleLightT = z.object({
+  type: z.literal('toggle-light'),
+  room: z.string(),
 })
-export type ToggleLight = t.TypeOf<typeof ToggleLightT>
+export type ToggleLight = z.infer<typeof ToggleLightT>
 export const ToggleLight = (room: string): ToggleLight => ({
   type: 'toggle-light',
   room,
 })
 
-export const SetHourT = t.type({
-  type: t.literal('set-hour'),
-  date: tt.DateFromISOString,
+export const SetHourT = z.object({
+  type: z.literal('set-hour'),
+  date: z.coerce.date(),
 })
 
-export type SetHour = t.TypeOf<typeof SetHourT>
+export type SetHour = z.infer<typeof SetHourT>
 export const SetHour = (date: Date): SetHour => ({ type: 'set-hour', date })
 
-export const SetZigbeeEventT = t.type({
-  type: t.literal('set-zigbee-event'),
-  key: t.string,
-  data: t.UnknownRecord,
+export const SetZigbeeEventT = z.object({
+  type: z.literal('set-zigbee-event'),
+  key: z.string(),
+  data: z.record(z.unknown()),
 })
 
-export type SetZigbeeEvent = t.TypeOf<typeof SetZigbeeEventT>
+export type SetZigbeeEvent = z.infer<typeof SetZigbeeEventT>
 export const SetZigbeeEvent = (
   key: string,
   data: Record<string, unknown>,
@@ -248,30 +249,31 @@ export const SetZigbeeEvent = (
 
 // helpers
 
-export const ClearRoomScenesT = t.type({ type: t.literal('clear-room-scenes') })
-export type ClearRoomScenes = t.TypeOf<typeof ClearRoomScenesT>
+export const ClearRoomScenesT = z.object({ type: z.literal('clear-room-scenes') })
+export type ClearRoomScenes = z.infer<typeof ClearRoomScenesT>
 export const ClearRoomScenes = (): ClearRoomScenes => ({
   type: 'clear-room-scenes',
 })
 
 // DeskCommand
-export const DeskCommandT = t.type({
-  type: t.literal('desk-cmd'),
-  room: t.string,
-  command: t.union([t.keyof({up: null, down: null, idle: null}), t.undefined]),
+export const DeskCommandT = z.object({
+  type: z.literal('desk-cmd'),
+  room: z.string(),
+  command: z.union([z.enum(['up', 'down', 'idle']), z.undefined()]),
 })
 
-export type DeskCommand = t.TypeOf<typeof DeskCommandT>
+export type DeskCommand = z.infer<typeof DeskCommandT>
 export const DeskCommand =
   (room: string, command: DeskCommand['command']): DeskCommand =>
-    ({type: 'desk-cmd',
+  ({
+    type: 'desk-cmd',
     room,
     command,
   })
 
 export const SetHouseScene = SetValue('houseScene')
 
-const MsgRawT = t.union([
+const MsgRawT = z.union([
   LeaveHouseT,
   BedtimeT,
   DoorbellTriggerT,
@@ -294,11 +296,11 @@ const MsgRawT = t.union([
   ClearRoomScenesT,
   DeskCommandT,
 ])
-type MsgRaw = t.TypeOf<typeof MsgRawT>
+type MsgRaw = z.infer<typeof MsgRawT>
 
-const ComposeT = t.type({ type: t.literal('compose'), msgs: t.array(MsgRawT) })
+const ComposeT = z.object({ type: z.literal('compose'), msgs: z.array(MsgRawT) })
 export const Compose = (msgs: MsgRaw[]) => ({ type: 'compose', msgs })
-export type Compose = t.TypeOf<typeof ComposeT>
+export type Compose = z.infer<typeof ComposeT>
 
-export const MsgT = t.union([MsgRawT, ComposeT])
-export type Msg = t.TypeOf<typeof MsgT>
+export const MsgT = z.union([MsgRawT, ComposeT])
+export type Msg = z.infer<typeof MsgT>

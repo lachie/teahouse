@@ -1,4 +1,3 @@
-import * as t from 'io-ts'
 import { Container } from '../house'
 
 type DispatchMessage<Msg> = (m: Msg) => void

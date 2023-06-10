@@ -1,26 +1,18 @@
 import express from 'express'
-import { pipe } from 'fp-ts/function'
-import { match, mapLeft } from 'fp-ts/Either'
-import * as t from 'io-ts'
-import { failure } from 'io-ts/PathReporter'
+import * as z from 'zod'
 import morgan from 'morgan'
 import cors from 'cors'
 import { InterfaceFactory } from './index'
 // import OAuth2Server from 'oauth2-server'
 // import { Model } from './oauthModel'
 
-const mapErrors = mapLeft((errors: t.Errors) => failure(errors).join(','))
-
 export default class HttpInterfaceFactory<Msg, Model> extends InterfaceFactory<
   Msg,
   Model
 > {
   // readonly oauthServer: OAuth2Server
-  constructor(public dec: t.Decoder<unknown, Msg>, oauthDBPath: string, public port = 3000) {
+  constructor(public msgSchema: z.ZodSchema<Msg>, public port = 3000) {
     super()
-    // this.oauthServer = new OAuth2Server({
-    //   model: new Model(oauthDBPath),
-    // })
   }
   build() {
     const {
@@ -46,24 +38,15 @@ export default class HttpInterfaceFactory<Msg, Model> extends InterfaceFactory<
     app.use(morgan('tiny'))
     app.use(cors())
     app.use(express.json())
-    app.post('/msg', (req, res) =>
-      pipe(
-        req.body,
-        (x) => (console.log('body', x), x),
-        this.dec.decode,
-        (x) => (console.log('decoded', x), x),
-        mapErrors,
-        match(
-          (errs) => {
-            res.status(500).send(errs)
-          },
-          (msg) => {
-            dispatchMessage(msg)
-            res.send('OK')
-          },
-        ),
-      ),
-    )
+    app.post('/msg', (req, res) => {
+      const result = this.msgSchema.safeParse(req.body)
+      if (result.success) {
+        dispatchMessage(result.data)
+        res.send('OK')
+      } else {
+        res.status(400).send(result.error.errors)
+      }
+    })
 
     app.get('/model-updates', (req, res) => {
       const headers = {

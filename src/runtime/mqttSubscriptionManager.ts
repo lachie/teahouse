@@ -1,5 +1,4 @@
 import { AsyncClient } from 'async-mqtt'
-import { string } from 'io-ts'
 import Emittery from 'emittery'
 
 type RawMessage = {
@@ -64,7 +63,7 @@ export class SubscriptionManager {
   constructor(
     readonly key: string[],
     readonly coreSubscriptionManager: CoreSubscriptionManager,
-  ) {}
+  ) { }
 
   push(key: string): SubscriptionManager {
     return new SubscriptionManager(

@@ -2,9 +2,9 @@ import { ZLight } from './zLight'
 
 
 test('light make', () => {
-    const light = ZLight.make('test', 'ikea', 'zig/topic', {white: [1,1,'cosy']})
+    const light = ZLight.make('test', 'ikea', 'zig/topic', ZLight.cosy(1, 1))
     expect(light.type).toBe('zLight')
-    expect(light).toEqual(expect.objectContaining({key: 'test', kind: 'ikea'}))
+    expect(light).toEqual(expect.objectContaining({ key: 'test', kind: 'ikea' }))
 })
 
 test('light parsePayload white', () => {
@@ -14,19 +14,19 @@ test('light parsePayload white', () => {
     let payload
 
     // morning
-    light.payload = {white: [1,1,'cosy']}
+    light.payload = ZLight.cosy(1, 0)
     payload = lightDev.parsePayload(light)
     console.log(payload.color_temp)
     expect(payload.color_temp).toEqual(250)
 
     // noon
-    light.payload = {white: [1,0.5,'cosy']}
+    light.payload = ZLight.cosy(1, 0.5)
     payload = lightDev.parsePayload(light)
     console.log(payload.color_temp)
     expect(payload.color_temp).toEqual(454)
 
     // arvo
-    light.payload = {white: [1,0,'cosy']}
+    light.payload = ZLight.cosy(1, 1.0)
     payload = lightDev.parsePayload(light)
     console.log(payload.color_temp)
     expect(payload.color_temp).toEqual(250)
@@ -34,19 +34,19 @@ test('light parsePayload white', () => {
     light.kind = 'ikea-spot'
 
     // morning
-    light.payload = {white: [1,1,'cosy']}
+    light.payload = ZLight.cosy(1, 0)
     payload = lightDev.parsePayload(light)
     console.log(payload.color_temp)
     expect(payload.color_temp).toEqual(312.5)
 
     // noon
-    light.payload = {white: [1,0.5,'cosy']}
+    light.payload = ZLight.cosy(1, 0.5)
     payload = lightDev.parsePayload(light)
     console.log(payload.color_temp)
     expect(payload.color_temp).toEqual(454)
 
     // arvo
-    light.payload = {white: [1,0,'cosy']}
+    light.payload = ZLight.cosy(1, 1)
     payload = lightDev.parsePayload(light)
     console.log(payload.color_temp)
     expect(payload.color_temp).toEqual(312.5)

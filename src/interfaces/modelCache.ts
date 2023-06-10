@@ -1,15 +1,7 @@
 import * as immutable from 'object-path-immutable'
+import * as z from 'zod'
 import fs from 'fs'
-import * as t from 'io-ts'
-import { failure } from 'io-ts/PathReporter'
-import { match, mapLeft, getOrElseW } from 'fp-ts/lib/Either'
-import { pipe } from 'fp-ts/function'
 import { InterfaceFactory } from '.'
-
-const getOrError = getOrElseW((errors: t.Errors) => {
-  throw new Error(failure(errors).join(','))
-})
-const mapErrors = mapLeft((errors: t.Errors) => failure(errors).join(','))
 
 export class ModelCacheFactory<Model, ModelCache, Msg> extends InterfaceFactory<
   Msg,
@@ -17,7 +9,7 @@ export class ModelCacheFactory<Model, ModelCache, Msg> extends InterfaceFactory<
 > {
   constructor(
     public cachePath: string,
-    public modelCacheCodec: t.Decoder<unknown, ModelCache>,
+    public modelCacheCodec: z.ZodSchema<ModelCache>,
     public modelZero: unknown,
     public modelToModelCache: (m: Model) => ModelCache,
   ) {
@@ -25,7 +17,7 @@ export class ModelCacheFactory<Model, ModelCache, Msg> extends InterfaceFactory<
   }
 
   build() {
-    const { subToModelChange, unsubToModelChange } = this
+    const { subToModelChange } = this
     if (subToModelChange === undefined) {
       throw new Error(
         "can't build modelCache interface without subToModelChange",
@@ -47,10 +39,10 @@ export class ModelCacheFactory<Model, ModelCache, Msg> extends InterfaceFactory<
     try {
       // TODO io-ts
       raw = JSON.parse(fs.readFileSync(this.cachePath, 'utf-8'))
+      return this.modelCacheCodec.parse(raw)
     } catch (e) {
       raw = this.modelZero
+      return this.modelCacheCodec.parse(raw)
     }
-
-    return pipe(raw, this.modelCacheCodec.decode, getOrError)
   }
 }

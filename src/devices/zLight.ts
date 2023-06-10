@@ -58,7 +58,7 @@ export type ZLightPayload = {
   color_temp: ZColourTemp
   white: WhiteSpec
 }
-export type PartialPayload = Partial<ZLightPayload>
+export type PartialPayload = Omit<Partial<ZLightPayload>, 'white'> & { white?: Partial<WhiteSpec> }
 
 export const white =
   (base: Partial<WhiteSpec>) => (brightness = 1.0) => (progress: number): Partial<ZLightPayload> =>
@@ -134,8 +134,8 @@ export class ZLight<Msg> extends PublishingDevice<
     const def = lightDefs[kind]
     let p = {}
     if (payload.white !== undefined) {
-      const { brightness, progress, range } = payload.white
-      const [warmScale, coolScale] = def.ranges[range]
+      const { brightness = 1.0, progress = 0.5, range } = payload.white
+      const [warmScale, coolScale] = def.ranges[range || 'cosy']
 
       // const tempScale = sineNorm(def.cosy, def.noon)
       const tempScale = sawNorm(

@@ -71,19 +71,19 @@ const influxClient = new InfluxDB({
 }).getWriteApi(secrets.influx.org, secrets.influx.bucket)
 
 const interfaces: InterfaceFactory<Msg, Model>[] = [
-  new HttpInterfaceFactory(MsgT, oauthDBPath, 3030),
+  new HttpInterfaceFactory(MsgT, 3030),
   modelCacheFactory,
 ]
 
-;(async () => {
-  await runtime(
-    {
-      update,
-      house,
-      subscriptions,
-      initialModel,
-    },
-    { mqttClient, influxClient, interfaces, logPath, secrets },
-    SetHour(new Date()), // initial message
-  )
-})()
+  ; (async () => {
+    await runtime(
+      {
+        update,
+        house,
+        subscriptions,
+        initialModel,
+      },
+      { mqttClient, influxClient, interfaces, logPath, secrets },
+      SetHour(new Date()), // initial message
+    )
+  })()

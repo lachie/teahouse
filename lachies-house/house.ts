@@ -106,7 +106,7 @@ const resolveSceneCommonArea = <RoomScenes>(
   }
 
   if (model.houseScene !== undefined) {
-    return model.houseScene
+    return model.houseScene as unknown as CommonArea<RoomScenes>
   }
 
   return 'none'

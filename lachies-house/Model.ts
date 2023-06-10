@@ -1,8 +1,7 @@
-import * as t from 'io-ts'
-import * as tt from 'io-ts-types'
 import { SensorReadingT } from './Msg'
 import { addDays, differenceInCalendarDays, addWeeks } from 'date-fns'
 import * as SunCalc from 'suncalc'
+import * as z from 'zod'
 
 const roomZero = <T = undefined>(extra: T): RoomModel & T => ({
   occupied: false,
@@ -73,37 +72,35 @@ const guests = (model: Model): Person[] => []
 // const v8 = require('v8');
 // const structuredClone = <T>(obj: T): T => v8.deserialize(v8.serialize(obj))
 
-export const RoomModelT = t.type({
-  occupied: t.boolean,
-  scene: t.union([t.undefined, t.string]),
-  sensors: t.record(t.string, SensorReadingT),
+export const RoomModelT = z.object({
+  occupied: z.boolean(),
+  scene: z.union([z.undefined(), z.string()]),
+  sensors: z.record(z.string(), SensorReadingT),
 })
-export type RoomModel = t.TypeOf<typeof RoomModelT>
+export type RoomModel = z.infer<typeof RoomModelT>
 
 export const BackroomModelT = RoomModelT
 export type BackroomModel = RoomModel
 
-export const OfficeRoomModelT = t.intersection([
+export const OfficeRoomModelT = z.intersection(
   RoomModelT,
-  t.type({
-    desk: t.type({ command: t.string }),
+  z.object({
+    desk: z.object({ command: z.string() }),
   }),
-])
-export type OfficeRoomModel = t.TypeOf<typeof OfficeRoomModelT>
+)
+export type OfficeRoomModel = z.infer<typeof OfficeRoomModelT>
 
-export const SunProgress = t.tuple([
-  t.number,
-  t.keyof({ day: null, night: null }),
+export const SunProgress = z.tuple([
+  z.number(),
+  z.enum(['day', 'night']),
 ])
-export type SunProgress = t.TypeOf<typeof SunProgress>
-
-const optionalT = (x: t.Mixed) => t.union([t.undefined, x])
+export type SunProgress = z.infer<typeof SunProgress>
 
 /*
  * model
  */
-export const ModelT = t.type({
-  rooms: t.type({
+export const ModelT = z.object({
+  rooms: z.object({
     playroom: RoomModelT,
     backroom: RoomModelT,
     office: OfficeRoomModelT,
@@ -111,28 +108,29 @@ export const ModelT = t.type({
     'pipers-room': RoomModelT,
     bedroom: RoomModelT,
   }),
-  people: t.readonlyArray(t.string),
-  doorbell: t.boolean,
-  doorbellBlink: t.boolean,
-  doorbellEvents: t.array(
-    t.tuple([
-      tt.DateFromISOString,
-      t.keyof({ triggered: null, cancelled: null }),
+  people: z.array(z.string()),
+  doorbell: z.boolean(),
+  doorbellBlink: z.boolean(),
+  doorbellEvents: z.array(
+    z.tuple([
+      z.coerce.date(),
+      z.enum(['triggered', 'cancelled']),
     ]),
   ),
-  userPresenceEvents: t.array(t.tuple([tt.DateFromISOString, t.string])),
-  date: tt.DateFromISOString,
-  hour: t.number,
-  hourLate: t.boolean,
-  kidweek: t.boolean,
+  userPresenceEvents: z.array(z.tuple([z.coerce.date(), z.string()])),
+  date: z.coerce.date(),
+  hour: z.number(),
+  hourLate: z.boolean(),
+  kidweek: z.boolean(),
   sunProgress: SunProgress,
-  daylightProgress: t.number,
-  houseScene: optionalT(t.string),
+  daylightProgress: z.number(),
+  houseScene: z.string().optional(),
 })
-export type Model = t.TypeOf<typeof ModelT>
+export type Model = z.infer<typeof ModelT>
 
 export type RoomKey = keyof Model['rooms']
-export const roomKeys = Object.keys(ModelT.props.rooms.props) as RoomKey[]
+export const roomKeys = ModelT.shape.rooms.keyof().options
+
 
 // export const modelZero = {
 //   rooms: {
@@ -198,19 +196,19 @@ export function newModel(): Model {
 
 type RoomId = keyof Model['rooms']
 
-const RoomCacheT = t.partial({
-  scene: t.string,
-  sensors: t.record(t.string, SensorReadingT),
-})
+const RoomCacheT = z.object({
+  scene: z.string(),
+  sensors: z.record(z.string(), SensorReadingT),
+}).partial()
 
-export const ModelCacheT = t.type({
-  rooms: t.type({
+export const ModelCacheT = z.object({
+  rooms: z.object({
     playroom: RoomCacheT,
     backroom: RoomCacheT,
     office: RoomCacheT,
   }),
 })
-export type ModelCache = t.TypeOf<typeof ModelCacheT>
+export type ModelCache = z.infer<typeof ModelCacheT>
 
 const kidWeekReference = new Date('2021-08-21')
 
