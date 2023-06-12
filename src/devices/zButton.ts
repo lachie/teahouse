@@ -25,7 +25,7 @@ export class ZButton<Msg> extends Device<ZButtonNode<Msg>, Msg> {
     }
   }
 
-  async add({ subMgr, schedMgr }: RuntimeContext<Msg>, p: ZButtonNode<Msg>) {
+  async add({ mqttSubMgr: subMgr, schedMgr }: RuntimeContext<Msg>, p: ZButtonNode<Msg>) {
     // console.log('add', p.key, p.topic)
     subMgr.subscribe(
       p.key,
@@ -43,7 +43,7 @@ export class ZButton<Msg> extends Device<ZButtonNode<Msg>, Msg> {
     )
   }
 
-  async remove({ subMgr }: RuntimeContext<Msg>, p: ZButtonNode<Msg>) {
+  async remove({ mqttSubMgr: subMgr }: RuntimeContext<Msg>, p: ZButtonNode<Msg>) {
     subMgr.unsubscribe(p.key, `zigbee2mqtt/${p.topic}`)
   }
 }

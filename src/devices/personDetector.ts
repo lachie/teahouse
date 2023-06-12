@@ -31,7 +31,7 @@ export class PersonDetector<Msg> extends Device<PersonDetectorNode<Msg>, Msg> {
     }
   }
 
-  async add({ subMgr, schedMgr }: RuntimeContext<Msg>, p: PersonDetectorNode<Msg>) {
+  async add({ mqttSubMgr: subMgr, schedMgr }: RuntimeContext<Msg>, p: PersonDetectorNode<Msg>) {
     subMgr.subscribe(p.key, p.topic, ({ message }: { message: string }) => {
       const occupied = message === '1'
       const msg = p.onChange(occupied)
@@ -55,7 +55,7 @@ export class PersonDetector<Msg> extends Device<PersonDetectorNode<Msg>, Msg> {
     })
   }
 
-  async remove({ subMgr }: RuntimeContext<Msg>, p: PersonDetectorNode<Msg>) {
+  async remove({ mqttSubMgr: subMgr }: RuntimeContext<Msg>, p: PersonDetectorNode<Msg>) {
     subMgr.unsubscribe(p.key, p.topic)
   }
 }

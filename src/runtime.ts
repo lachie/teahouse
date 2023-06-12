@@ -3,8 +3,8 @@ import { Devices } from './devices'
 import { childrenToRecord, AnyNode, Container, Empty } from './house'
 import { ScheduleManager } from './runtime/scheduleManager'
 import {
-  CoreSubscriptionManager,
-  SubscriptionManager,
+  RootMqttSubscriptionManager,
+  MqttSubscriptionManager,
 } from './runtime/mqttSubscriptionManager'
 import { Sub, SubscriptionsManager } from './runtime/subscriptions'
 
@@ -21,24 +21,29 @@ import * as stream from 'node:stream'
 
 export type Secrets = Record<string, Record<string, string>>
 
+/**
+ * RuntimeContext is a container for all the runtime dependencies, scoped to a node.
+ * 
+ * RuntimeContext is scoped by pushing a node's key and returning a new scoped copy of RuntimeContext.
+ */
 export class RuntimeContext<Msg> {
   constructor(
     readonly key: string[],
     readonly mqttClient: mqtt.AsyncClient,
     readonly influxClient: InfluxWriteApi,
-    readonly subMgr: SubscriptionManager,
+    readonly mqttSubMgr: MqttSubscriptionManager,
     readonly schedMgr: ScheduleManager<Msg>,
     readonly secrets: Secrets,
     readonly devices: Devices<Msg>,
-    public dispatchMessage: (m: Msg) => void = () => {},
-  ) {}
+    public dispatchMessage: (m: Msg) => void = () => { },
+  ) { }
 
   push(key: string): RuntimeContext<Msg> {
     return new RuntimeContext(
       this.key.concat(key),
       this.mqttClient,
       this.influxClient,
-      this.subMgr.push(key),
+      this.mqttSubMgr.push(key),
       this.schedMgr.push(key),
       this.secrets,
       this.devices,
@@ -68,7 +73,9 @@ type Extras<Msg, Model> = {
   secrets: Secrets
 }
 
-// the main entrypoint for user's house scripts
+/**
+ * The main entrypoint for user's house scripts.
+ */
 export async function runtime<Msg, Model>(
   spec: RuntimeSpec<Model, Msg>,
   extras: Extras<Msg, Model>,
@@ -77,17 +84,18 @@ export async function runtime<Msg, Model>(
   const scheduleManager = new ScheduleManager<Msg>()
   const { mqttClient, influxClient } = extras
 
-  const subscriptionManager = new CoreSubscriptionManager(
+  const mqttSubscriptionManager = new RootMqttSubscriptionManager(
     mqttClient,
   ).subscriptionManager()
 
   const devices = new Devices<Msg>(extras.secrets)
 
+  // The root runtime context.
   const runtimeContext = new RuntimeContext<Msg>(
     [],
     mqttClient,
     influxClient,
-    subscriptionManager,
+    mqttSubscriptionManager,
     scheduleManager,
     extras.secrets,
     devices,
@@ -98,6 +106,14 @@ export async function runtime<Msg, Model>(
   await rt.run(initialMsg)
 }
 
+/**
+ * The runtime is the main loop of the house.
+ * 
+ * In essence it is a state machine that 
+ * - takes a message and updates the model.
+ * - takes the model and produces (reifies) a new house.
+ * - takes the new house and applies side effects.
+ */
 export class Runtime<Model, Msg> {
   update: (model: Model, msg: Msg) => [Model, Command<Msg>]
   subscriptions: (model: Model) => Sub<Msg>
@@ -164,7 +180,11 @@ export class Runtime<Model, Msg> {
     this.logStream.write('\n')
   }
 
-  // kick off the runtime
+  /**
+   * Kick off the runtime.
+   * From here on out, the runtime will be driven by messages from either the outside world or subscriptions.
+   * There's no explicit loop.
+   */
   async run(initialMsg?: Msg) {
     if (initialMsg !== undefined) {
       this.log('initialMsg', initialMsg)
@@ -190,7 +210,10 @@ export class Runtime<Model, Msg> {
     this.log('firstHouseState', this.houseState)
   }
 
-  // inject a message into the runtime
+  /**
+   * Inject a message into the runtime.
+   * After run, this is the only way to drive the runtime.
+   */
   async dispatchMessage(msg: Msg) {
     this.log('dm.msg', msg)
     const [nextModel, _] = this.update(this.model, msg)
@@ -220,6 +243,10 @@ export class Runtime<Model, Msg> {
     this.log('dm.houseState', this.houseState)
   }
 
+  /**
+   * Reifies a new node from the previous node, applying side effects along the way.
+   * Instead of throwing an error, it logs the error and returns the previous node.
+   */
   async reifyNodeSafe<Msg>(
     ctx: RuntimeContext<Msg>,
     node: Container<Msg>,
@@ -234,7 +261,9 @@ export class Runtime<Model, Msg> {
   }
 }
 
-// takes a node tree and applies side effects
+/**
+ * Takes a node tree and produces a new one, applying changes and side effects on leaf nodes (devices).
+ */
 export async function reifyNode<Msg>(
   ctx: RuntimeContext<Msg>,
   node: Container<Msg>,

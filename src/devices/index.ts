@@ -32,9 +32,11 @@ type DeviceNode<Msg> =
   | RoomMetaNode
 type DeviceType<Msg> = DeviceNode<Msg>['type']
 type DeviceList<Msg> = Record<DeviceType<Msg>, Device<DeviceNode<Msg>, Msg>>
-// [k: string]: Device<DeviceNode<Msg>, Msg>
-// }
 
+/**
+ * Devices is the abstract helper device that dispatches to the correct device implementation
+ * base on a DeviceNode's type.
+ */
 export class Devices<Msg> extends Device<DeviceNode<Msg>, Msg> {
   devices: DeviceList<Msg>
   constructor(secrets: Secrets) {
@@ -54,14 +56,23 @@ export class Devices<Msg> extends Device<DeviceNode<Msg>, Msg> {
       roomMeta: new RoomMeta<Msg>(),
     }
   }
-  choose(d: Node): Device<DeviceNode<Msg>, Msg> {
+
+  /**
+   * Choose the implemtation class for the device node.
+   */
+  choose(d: Node): Device<DeviceNode<Msg>, Msg> | never {
     const dev = this.devices[d.type as DeviceType<Msg>]
     if (dev) return dev
     throw new Error(`unknown device ${d.type}`)
   }
+
+  /**
+   * Type assertion for DeviceNode<Msg> 
+   */
   isDevice(d: Node): d is DeviceNode<Msg> {
     return Object.keys(this.devices).includes(d.type)
   }
+
   async update(context: any, device: Node, prevDevice: Node) {
     if (!this.isDevice(prevDevice) || !this.isDevice(device)) return
     await this.choose(device).update(context, device, prevDevice)

@@ -8,7 +8,7 @@ type RawMessage = {
 
 type Handler = (msg: RawMessage) => void
 
-export class CoreSubscriptionManager {
+export class RootMqttSubscriptionManager {
   bus: Emittery = new Emittery()
   handlers: Record<string, Handler> = {}
   offs: Record<string, any> = {}
@@ -24,7 +24,7 @@ export class CoreSubscriptionManager {
   }
 
   subscriptionManager() {
-    return new SubscriptionManager([], this)
+    return new MqttSubscriptionManager([], this)
   }
 
   subscribe(key: string, topic: string, handler: (msg: RawMessage) => void) {
@@ -59,14 +59,14 @@ export class CoreSubscriptionManager {
   }
 }
 
-export class SubscriptionManager {
+export class MqttSubscriptionManager {
   constructor(
     readonly key: string[],
-    readonly coreSubscriptionManager: CoreSubscriptionManager,
+    readonly coreSubscriptionManager: RootMqttSubscriptionManager,
   ) { }
 
-  push(key: string): SubscriptionManager {
-    return new SubscriptionManager(
+  push(key: string): MqttSubscriptionManager {
+    return new MqttSubscriptionManager(
       this.key.concat(key),
       this.coreSubscriptionManager,
     )
