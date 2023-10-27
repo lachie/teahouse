@@ -1,16 +1,13 @@
 <script lang="ts">
 	import type { Model } from '$lib/lachies-house/Model';
+	import { formatTime } from '$lib/time';
 	import { Sun, Moon, Icon } from 'svelte-hero-icons';
 
 	export let model: Model | null;
+	export let showTime = true;
 	$: [prog, dayNight] = model?.sunProgress || [0, 'day'];
 	$: date = model?.date || new Date();
 
-	const formatTime = (date: Date) => {
-		const hours = date.getHours();
-		const minutes = date.getMinutes();
-		return `${hours}:${minutes}`;
-	};
 	$: console.log('dayNight', dayNight, prog);
 
 	$: icon = dayNight === 'day' ? Sun : Moon;
@@ -26,9 +23,11 @@
 			</div>
 		</div>
 	</div>
-	<div class="px-4 w-full">
-		<div class="relative h-8 w-8 -mx-4 text-s font-semibold text-gray-400 text-center" style:left>
-			{timeS}
+	{#if showTime}
+		<div class="px-4 w-full">
+			<div class="relative h-8 w-8 -mx-4 text-s font-semibold text-gray-400 text-center" style:left>
+				{timeS}
+			</div>
 		</div>
-	</div>
+	{/if}
 </div>

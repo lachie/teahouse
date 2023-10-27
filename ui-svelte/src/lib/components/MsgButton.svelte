@@ -8,8 +8,9 @@
 	// export let extraClass: string = undefined;
 	export let extraClass: string | undefined = undefined;
 	export let tagger: () => Msg;
+	export let size: 'normal' | 'large' = 'normal';
 
 	extraClass = extraClass || 'bg-zinc-500';
 </script>
 
-<ControlButton {icon} {extraClass} on:click={dispatchMsgTaggerSync(tagger)} />
+<ControlButton {size} {icon} {extraClass} on:click={dispatchMsgTaggerSync(tagger)} />

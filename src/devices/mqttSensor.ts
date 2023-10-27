@@ -6,7 +6,8 @@ export type MqttSensorNode<Msg> = Node & {
   type: 'mqttSensor'
   key: string
   topic: string
-  tagger: (payload: Record<string, unknown>) => Msg
+  tagger?: (payload: Record<string, unknown>) => Msg
+  recordMetrics?: boolean
 }
 
 const defaultOffDelay = 10 * 1000
@@ -16,17 +17,31 @@ export class MqttSensor<Msg> extends Device<MqttSensorNode<Msg>, Msg> {
     key: string,
     topic: string,
     tagger: (action: Record<string, unknown>) => Msg,
+    recordMetrics?: boolean,
   ): MqttSensorNode<Msg> {
     return {
       type: 'mqttSensor',
       key,
       topic,
       tagger,
+      recordMetrics,
     }
   }
 
-  async add({ mqttSubMgr, schedMgr }: RuntimeContext<Msg>, p: MqttSensorNode<Msg>) {
-    console.log('MqttSensor add', p.key, p.topic)
+  static makeMetrics<Msg>(
+    key: string,
+    topic: string,
+  ): MqttSensorNode<Msg> {
+    return {
+      type: 'mqttSensor',
+      key,
+      topic,
+      recordMetrics: true
+    }
+  }
+
+  async add({ mqttSubMgr, schedMgr, metrics }: RuntimeContext<Msg>, p: MqttSensorNode<Msg>) {
+    console.log('MqttSensor add', p.key, p.topic, p.recordMetrics ? 'metrics' : '')
     mqttSubMgr.subscribe(
       p.key,
       p.topic,
@@ -35,9 +50,13 @@ export class MqttSensor<Msg> extends Device<MqttSensorNode<Msg>, Msg> {
         const payload = JSON.parse(message)
 
         if (payload !== undefined) {
-          const msg = p.tagger(payload)
-
-          schedMgr.dispatchMessage(msg)
+          if (p.tagger) {
+            const msg = p.tagger(payload)
+            schedMgr.dispatchMessage(msg)
+          }
+          if (p.recordMetrics) {
+            metrics.record(payload)
+          }
         }
       },
     )

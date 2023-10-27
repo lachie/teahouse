@@ -11,10 +11,9 @@ import { Sub, SubscriptionsManager } from './runtime/subscriptions'
 import * as mqtt from 'async-mqtt'
 import EventEmitter from 'events'
 import {
-  consoleLogger,
   WriteApi as InfluxWriteApi,
 } from '@influxdata/influxdb-client'
-import immutable from 'object-path-immutable'
+import { IMetrics } from './metrics/metrics'
 import equal from 'deep-equal'
 import { InterfaceFactory } from './interfaces'
 import * as stream from 'node:stream'
@@ -31,6 +30,7 @@ export class RuntimeContext<Msg> {
     readonly key: string[],
     readonly mqttClient: mqtt.AsyncClient,
     readonly influxClient: InfluxWriteApi,
+    readonly metrics: IMetrics,
     readonly mqttSubMgr: MqttSubscriptionManager,
     readonly schedMgr: ScheduleManager<Msg>,
     readonly secrets: Secrets,
@@ -43,6 +43,7 @@ export class RuntimeContext<Msg> {
       this.key.concat(key),
       this.mqttClient,
       this.influxClient,
+      this.metrics.push(key),
       this.mqttSubMgr.push(key),
       this.schedMgr.push(key),
       this.secrets,
@@ -68,6 +69,7 @@ type RuntimeSpec<Model, Msg> = {
 type Extras<Msg, Model> = {
   mqttClient: mqtt.AsyncClient
   influxClient: InfluxWriteApi
+  metrics: IMetrics,
   interfaces: InterfaceFactory<Msg, Model>[]
   logPath: string
   secrets: Secrets
@@ -82,10 +84,9 @@ export async function runtime<Msg, Model>(
   initialMsg?: Msg,
 ) {
   const scheduleManager = new ScheduleManager<Msg>()
-  const { mqttClient, influxClient } = extras
 
   const mqttSubscriptionManager = new RootMqttSubscriptionManager(
-    mqttClient,
+    extras.mqttClient,
   ).subscriptionManager()
 
   const devices = new Devices<Msg>(extras.secrets)
@@ -93,8 +94,9 @@ export async function runtime<Msg, Model>(
   // The root runtime context.
   const runtimeContext = new RuntimeContext<Msg>(
     [],
-    mqttClient,
-    influxClient,
+    extras.mqttClient,
+    extras.influxClient,
+    extras.metrics,
     mqttSubscriptionManager,
     scheduleManager,
     extras.secrets,

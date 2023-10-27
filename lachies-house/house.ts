@@ -27,7 +27,6 @@ import { ZPresence, ZTemp } from '../src/devices/zSensor'
 import { TelegramMessage } from '../src/devices/telegramBot'
 import { Person } from '../src/devices/person'
 import { DeskCommand, DeskCtl } from '../src/devices/deskctl'
-import { ShellyDimmer, ShellyDimmerPayload } from '../src/devices/shellyDimmer'
 
 /*
  * house
@@ -54,8 +53,9 @@ export const house = (model: Model): Container<Msg> => ({
     backroom(model.rooms.backroom, model),
     bedroom(model.rooms.bedroom, model),
     office(model.rooms.office, model),
-    pipers_room(model.rooms['pipers-room'], model),
-    sams_room(model.rooms['sams-room'], model),
+    storage(model.rooms.storage, model),
+    // pipers_room(model.rooms['pipers-room'], model),
+    // sams_room(model.rooms['sams-room'], model),
   ],
 })
 
@@ -160,42 +160,38 @@ const backroom = commonRoom<BackroomScenes>(({ progress, scene }): Container<Msg
   type Payloads = [
     Partial<ZLightPayload>,
     Partial<ZLightPayload>,
-    ShellyDimmerPayload,
   ]
-  const [payload, payload2, payloadSink] = match<
+  const [payload, payload2] = match<
     CommonArea<BackroomScenes>,
     Payloads
   >(scene)
     .with('off', 'none', () => [
       ZLight.off,
       ZLight.off,
-      { state: false },
     ])
     .with('doorbell', () => [
       ZLight.doorbell,
       ZLight.doorbell,
-      { state: true },
     ])
     .with('dim', () => [
       ZLight.cosy(0.3, progress),
       ZLight.cosy(0.3 * 0.2, progress),
-      { state: true },
     ])
     .with('bright', 'bedtime', 'on', () => [
       ZLight.cosy(1.0, progress),
       ZLight.cosy(1.0 * 0.15, progress),
-      { state: true },
     ])
     .with('work', () => [
       ZLight.work,
       ZLight.work,
-      { state: true },
     ])
     .exhaustive()
 
   return Room(
     'backroom',
-    ShellyDimmer.make('sink', 'kitchen/light-sink', payloadSink),
+    ZLight.make('kitchen1', 'ikea', 'kitchen/sink-1', payload),
+    ZLight.make('kitchen2', 'ikea', 'kitchen/sink-2', payload),
+    ZLight.make('kitchen3', 'ikea', 'kitchen/sink-3', payload),
     ZLight.make('light1', 'ikea', 'backroom/lamp', payload),
     ZLight.make('spot1', 'ikea-spot', 'backroom/spot-1', payload),
     ZLight.make('spot2', 'ikea-spot', 'backroom/spot-2', payload),
@@ -207,7 +203,7 @@ const backroom = commonRoom<BackroomScenes>(({ progress, scene }): Container<Msg
       SetRoomSceneMap('backroom', buttons),
     ),
     ZPresence.make('backroom', 'backroom/motion', SetSensorRaw('backroom')),
-    ZTemp.make('backroom', 'backroom/temp', SetSensorRaw('backroom')),
+    ZTemp.make('backroom', 'backroom/temp', SetSensorRaw('backroom'), true),
   )
 })
 
@@ -243,10 +239,35 @@ type OfficeScenes = 'dim' | 'morning2' | 'bright' | 'work' | 'purple' | 'blue'
 const office = (room: OfficeRoomModel, model: Model): Container<Msg> => {
   return Room(
     'office',
-    ZTemp.make('office', 'office/temp', SetSensorRaw('office')),
+    ZTemp.make('office', 'office/temp', SetSensorRaw('office'), true),
     DeskCtl.make('office', 'office/desk', room.desk.command as DeskCommand),
   )
 }
+
+type StorageScenes = 'on'
+const storage = commonRoom<StorageScenes>(({ scene, progress }): Container<Msg> => {
+  const buttons = hashTagger({
+    '1_single': 'off',
+    '2_single': 'on',
+    '3_single': 'on',
+  })
+
+  const payload = match<CommonArea<StorageScenes>, Partial<ZLightPayload>>(scene)
+    .with('off', 'none', 'bedtime', () => ZLight.off)
+    .with('on', () => ZLight.cosy(1.0, progress))
+    .with('doorbell', () => ZLight.doorbell) // yeah, doorbell blinking in my room
+    .exhaustive()
+
+  return Room(
+    'storage',
+    ZLight.make('light1', 'ikea', 'storage/light', payload),
+    ZButton.make(
+      'button1',
+      'storage/buttonsx3',
+      SetRoomSceneMap('storage', buttons),
+    ),
+  )
+})
 
 /*
  * The 'playroom' where the kids do homework and we all game.
@@ -270,19 +291,19 @@ const playroom = commonRoom<PlayroomScenes>(({ scene, progress }): Container<Msg
     .with('dim', () => ([ZLight.cosy(0.3, progress), ZLight.cosy(0.3, progress)]))
     .with('bright', 'on', () => ([
       ZLight.cosy(1.0, progress),
-      ZLight.cosy(0.15, progress),
+      ZLight.cosy(0.5, progress),
     ]))
     .with('work', () => ([ZLight.work, ZLight.work]))
     .exhaustive()
 
-  const [payload1, payload2] = payload
+  const [payload1, payload_desks] = payload
 
   return Room(
     'playroom',
     ZLight.make('light1', 'ikea', 'playroom/lamp-desk', payload1),
     ZLight.make('light2', 'ikea', 'playroom/lamp-tall', payload1),
-    ZLight.make('light3a', 'ikea-spot', 'playroom/spot-1', payload1),
-    ZLight.make('light3b', 'ikea-spot', 'playroom/spot-2', payload2),
+    ZLight.make('light3a', 'ikea-spot', 'playroom/spot-1', payload_desks),
+    ZLight.make('light3b', 'ikea-spot', 'playroom/spot-2', payload_desks),
     ZLight.make('light3c', 'ikea-spot', 'playroom/spot-3', payload1),
     ZButton.make(
       'button1',
@@ -294,7 +315,8 @@ const playroom = commonRoom<PlayroomScenes>(({ scene, progress }): Container<Msg
       'playroom/buttonsx3-2',
       SetRoomSceneMap('playroom', buttons),
     ),
-    ZTemp.make('playroom', 'playroom/temp', SetSensorRaw('playroom')),
+    ZTemp.make('playroom', 'playroom/temp', SetSensorRaw('playroom'), true),
+    // MqttSensor.makeMetrics('playroom', 'motion/playroom'),
   )
 }
 )
@@ -331,5 +353,5 @@ const kidRoom =
       )
     })
 
-const pipers_room = kidRoom('pipers-room')
-const sams_room = kidRoom('sams-room')
+// const pipers_room = kidRoom('pipers-room')
+// const sams_room = kidRoom('sams-room')

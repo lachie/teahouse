@@ -24,6 +24,7 @@ import { ModelCacheFactory } from './src/interfaces/modelCache'
 import path from 'path/posix'
 
 import secrets from './secrets.json'
+import { InfluxMetrics } from './src/metrics/metrics'
 
 const logPath = path.resolve(__dirname, './log.json')
 const oauthDBPath = path.resolve(__dirname, './oauthDB.json')
@@ -70,6 +71,8 @@ const influxClient = new InfluxDB({
   token: secrets.influx.token,
 }).getWriteApi(secrets.influx.org, secrets.influx.bucket)
 
+const metrics = new InfluxMetrics(influxClient, ['house'])
+
 const interfaces: InterfaceFactory<Msg, Model>[] = [
   new HttpInterfaceFactory(MsgT, 3030),
   modelCacheFactory,
@@ -83,7 +86,7 @@ const interfaces: InterfaceFactory<Msg, Model>[] = [
         subscriptions,
         initialModel,
       },
-      { mqttClient, influxClient, interfaces, logPath, secrets },
+      { mqttClient, influxClient, metrics, interfaces, logPath, secrets },
       SetHour(new Date()), // initial message
     )
   })()

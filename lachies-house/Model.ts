@@ -26,6 +26,7 @@ export function initialModel(initialDate: Date): Model {
     rooms: {
       playroom: roomZero({}),
       backroom: roomZero({}),
+      storage: roomZero({}),
       office: roomZero({
         desk: {
           command: 'idle',
@@ -107,6 +108,7 @@ export const ModelT = z.object({
     'sams-room': RoomModelT,
     'pipers-room': RoomModelT,
     bedroom: RoomModelT,
+    storage: RoomModelT,
   }),
   people: z.array(z.string()),
   doorbell: z.boolean(),
@@ -161,6 +163,11 @@ export const modelZero: Model = {
       },
     },
     bedroom: {
+      occupied: false,
+      sensors: {},
+      scene: undefined,
+    },
+    storage: {
       occupied: false,
       sensors: {},
       scene: undefined,

@@ -20,7 +20,6 @@ export class RootMqttSubscriptionManager {
     this.mqttClient.on('message', (topic, message) => {
       this.dispatchMessage({ topic, message: message.toString() })
     })
-
   }
 
   subscriptionManager() {
